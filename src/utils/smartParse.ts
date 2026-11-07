@@ -24,7 +24,10 @@ const CATEGORY_WORDS: Record<string, string[]> = {
   理财: ["利息", "基金", "股票", "收益", "分红", "理财"],
 };
 
-const INCOME_WORDS = ["工资", "薪水", "奖金", "收入", "进账", "到账", "收到", "赚", "报销", "利息", "收益", "红包", "分红"];
+const INCOME_WORDS = [
+  "工资", "奖金", ...CATEGORY_WORDS.工资, ...CATEGORY_WORDS.奖金,
+  "收入", "进账", "到账", "收到", "赚", "报销", "利息", "收益", "分红",
+];
 
 // 先去掉日期表达，避免「11月7日」里的数字被误当成金额。
 const DATE_PATTERNS = [
@@ -63,12 +66,7 @@ function parseCategory(text: string, type: TransactionType): string {
   const direct = categories.find(category => text.includes(category));
   if (direct) return direct;
 
-  const matched = Object.entries(CATEGORY_WORDS).find(([, words]) =>
-    words.some(word => text.includes(word)),
-  )?.[0];
-  if (matched && categories.includes(matched)) return matched;
-
-  return "其他";
+  return categories.find(category => CATEGORY_WORDS[category]?.some(word => text.includes(word))) ?? "其他";
 }
 
 function parseAmount(text: string): number | null {
