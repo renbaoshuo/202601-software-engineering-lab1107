@@ -182,8 +182,13 @@ export default function DataManagement() {
   );
   const canImport = Boolean(
     importPreview
-    && importPreview.transactions.length > 0
-    && (importPreview.format === "csv" || importPreview.issues.length === 0),
+    && (
+      (importMode === "overwrite" && importPreview.backup)
+      || (
+        importPreview.transactions.length > 0
+        && (importPreview.format === "csv" || importPreview.issues.length === 0)
+      )
+    ),
   );
 
   function refreshBackups() {
@@ -317,7 +322,10 @@ export default function DataManagement() {
       refreshBackups();
       setImportPreview(null);
       setImportConfirmOpen(false);
-      const message = `已${importMode === "append" ? "追加" : "覆盖"}导入 ${preview.transactions.length} 条账单`
+      const imported = hasFullBackup && importMode === "overwrite"
+        ? `${preview.transactions.length} 条账单、${preview.budgets.length} 条预算、${preview.savingsGoals.length} 个储蓄目标`
+        : `${preview.transactions.length} 条账单`;
+      const message = `已${importMode === "append" ? "追加" : "覆盖"}导入 ${imported}`
         + (preview.issues.length > 0 ? `，跳过 ${preview.issues.length} 个错误项` : "")
         + (importMode === "overwrite" ? "，覆盖前数据已自动备份" : "");
       setFeedback({
@@ -698,7 +706,7 @@ export default function DataManagement() {
                   </Button>
                   {importPreview && !canImport && (
                     <Text c="red.7" size="sm">
-                      {importPreview.issues.length > 0
+                      {importPreview.format === "json" && importPreview.issues.length > 0
                         ? "JSON 文件存在错误，请修正后重新选择"
                         : "文件中没有可导入的有效账单"}
                     </Text>
