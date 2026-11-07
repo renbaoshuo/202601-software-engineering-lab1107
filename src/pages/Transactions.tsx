@@ -1,8 +1,11 @@
-import { Button, Card, Container, Group, Stack, Table, Text, Title } from "@mantine/core";
+import { useEffect, useState } from "react";
+import { Affix, Button, Card, Container, Group, Notification, Stack, Table, Text, Title } from "@mantine/core";
+import { IconCheck } from "@tabler/icons-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link, useSearchParams } from "react-router";
 import TransactionForm from "../components/TransactionForm";
 import { transactions } from "../shared/db";
+import type { NewTransaction } from "../shared/types";
 import { formatAmount } from "../utils/format";
 
 function RecentTransactions() {
@@ -43,7 +46,19 @@ function RecentTransactions() {
 
 export default function Transactions() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [saved, setSaved] = useState<NewTransaction | null>(null);
   const showList = searchParams.get("view") === "list";
+
+  useEffect(() => {
+    if (!saved) return;
+    const timer = setTimeout(() => setSaved(null), 3500);
+    return () => clearTimeout(timer);
+  }, [saved]);
+
+  function handleSaved(transaction: NewTransaction, continueAdding: boolean) {
+    setSaved(transaction);
+    if (!continueAdding) setSearchParams({ view: "list" }, { replace: true });
+  }
 
   return (
     <Container size="md">
@@ -64,10 +79,23 @@ export default function Transactions() {
                   <Title order={2}>收支记录</Title>
                   <Text size="sm" c="dimmed">随手记下一笔，日期、金额、类别一次填好。</Text>
                 </Stack>
-                <TransactionForm onReturn={() => setSearchParams({ view: "list" }, { replace: true })} />
+                <TransactionForm onSaved={handleSaved} />
               </>
             )}
       </Stack>
+      {saved && (
+        <Affix position={{ top: 16, right: 16 }} zIndex={400}>
+          <Notification
+            color="green"
+            icon={<IconCheck size={18} />}
+            title="保存成功"
+            closeButtonProps={{ "aria-label": "关闭保存提示" }}
+            onClose={() => setSaved(null)}
+          >
+            {`已记下这笔${saved.type === "expense" ? "支出" : "收入"} ${formatAmount(saved.amount)}`}
+          </Notification>
+        </Affix>
+      )}
     </Container>
   );
 }

@@ -1,10 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
-  Affix,
   Button,
   Card,
   Group,
-  Notification,
   NumberInput,
   SegmentedControl,
   Select,
@@ -19,13 +17,12 @@ import {
   IconArrowLeft,
   IconBolt,
   IconCalendar,
-  IconCheck,
   IconDeviceFloppy,
   IconWand,
 } from "@tabler/icons-react";
 import { DEFAULT_CATEGORIES } from "../shared/constants";
 import { transactions } from "../shared/db";
-import type { TransactionType } from "../shared/types";
+import type { NewTransaction, TransactionType } from "../shared/types";
 import { notifyTransactionAdded } from "../utils/events";
 import { formatAmount, formatDate, toCents } from "../utils/format";
 import { parseTransactionText } from "../utils/smartParse";
@@ -37,7 +34,7 @@ interface FormErrors {
 }
 
 interface TransactionFormProps {
-  onReturn: () => void;
+  onSaved: (transaction: NewTransaction, continueAdding: boolean) => void;
 }
 
 interface QuickTemplate {
@@ -57,7 +54,7 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
   { label: "工资", type: "income", category: "工资", amount: 800000, note: "工资" },
 ];
 
-export default function TransactionForm({ onReturn }: TransactionFormProps) {
+export default function TransactionForm({ onSaved }: TransactionFormProps) {
   const amountRef = useRef<HTMLInputElement>(null);
   const [type, setType] = useState<TransactionType>("expense");
   const [amount, setAmount] = useState<number | string>("");
@@ -67,16 +64,9 @@ export default function TransactionForm({ onReturn }: TransactionFormProps) {
   const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [success, setSuccess] = useState<{ text: string; at: number } | null>(null);
   const [parseText, setParseText] = useState("");
   const [parseError, setParseError] = useState("");
   const [parseTip, setParseTip] = useState("");
-
-  useEffect(() => {
-    if (!success) return;
-    const timer = setTimeout(() => setSuccess(null), 3500);
-    return () => clearTimeout(timer);
-  }, [success]);
 
   function changeType(value: string) {
     setType(value as TransactionType);
@@ -157,10 +147,6 @@ export default function TransactionForm({ onReturn }: TransactionFormProps) {
       notifyTransactionAdded(input);
 
       if (continueAdding) {
-        setSuccess({
-          text: `已记下这笔${type === "expense" ? "支出" : "收入"} ${formatAmount(input.amount)}`,
-          at: Date.now(),
-        });
         // 连续记账保留日期与收支类型，只清空本笔业务字段并聚焦金额。
         setAmount("");
         setNote("");
@@ -169,9 +155,8 @@ export default function TransactionForm({ onReturn }: TransactionFormProps) {
         setParseTip("");
         amountRef.current?.focus();
       }
-      else {
-        onReturn();
-      }
+
+      onSaved(input, continueAdding);
     }
     catch {
       setSaveError("保存失败，请稍后重试");
@@ -317,19 +302,6 @@ export default function TransactionForm({ onReturn }: TransactionFormProps) {
             </Button>
           </Group>
         </Stack>
-
-        {success && (
-          <Affix position={{ top: 16, right: 16 }} zIndex={400}>
-            <Notification
-              color="green"
-              icon={<IconCheck size={18} />}
-              title="保存成功"
-              onClose={() => setSuccess(null)}
-            >
-              {success.text}
-            </Notification>
-          </Affix>
-        )}
       </Card>
     </Stack>
   );
