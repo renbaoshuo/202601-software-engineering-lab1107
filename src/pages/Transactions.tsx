@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  Affix,
   Alert,
   Badge,
   Button,
   Card,
   Container,
   Group,
+  Modal,
+  Notification,
   Pagination,
   SegmentedControl,
   Select,
@@ -16,8 +19,12 @@ import {
 } from "@mantine/core";
 import {
   IconArrowsSort,
+  IconCheck,
   IconClock,
+  IconPlus,
 } from "@tabler/icons-react";
+import { useDisclosure } from "@mantine/hooks";
+import TransactionForm from "../components/TransactionForm";
 import TransactionQuery from "../components/TransactionQuery";
 import useTransactionQuery from "../hooks/useTransactionQuery";
 import { transactions } from "../shared/db";
@@ -50,12 +57,25 @@ export default function Transactions() {
   const [page, setPage] = useState(1);
   const [showRecent, setShowRecent] = useState(false);
 
+  const [addOpened, { open: openAdd, close: closeAdd }] = useDisclosure();
+  const [notice, setNotice] = useState<{ message: string } | null>(null);
   const result = useTransactionQuery(filter, {
     page: showRecent ? 1 : page,
     pageSize: showRecent ? 5 : PAGE_SIZE,
     sortBy: showRecent ? "date" : sortField,
     order: showRecent ? "desc" : sortOrder,
   });
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 3500);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  function handleAdded(transaction: NewTransaction, continueAdding: boolean) {
+    setNotice({ message: `已记录${transaction.type === "income" ? "收入" : "支出"} ${formatAmount(transaction.amount)}` });
+    if (!continueAdding) closeAdd();
+  }
 
   function handleSortFieldChange(value: string | null) {
     if (value) {
@@ -80,6 +100,18 @@ export default function Transactions() {
       <Stack gap="md">
         <Group justify="space-between">
           <Title order={2}>账单</Title>
+          <Button leftSection={<IconPlus size={16} />} onClick={openAdd}>记一笔</Button>
+        </Group>
+
+        <TransactionQuery
+          categories={result?.categories ?? []}
+          onSearch={(nextFilter) => {
+            setFilter(nextFilter);
+            setPage(1);
+          }}
+        />
+
+        <Group justify="space-between">
           <SegmentedControl
             value={showRecent ? "recent" : "all"}
             onChange={(v) => {
@@ -91,19 +123,7 @@ export default function Transactions() {
               { label: "最近 5 条", value: "recent" },
             ]}
           />
-        </Group>
-
-        <TransactionQuery
-          categories={result?.categories ?? []}
-          onSearch={(nextFilter) => {
-            setFilter(nextFilter);
-            setPage(1);
-          }}
-        />
-
-        {/* 排序控制区 */}
-        <Card withBorder padding="sm">
-          <Group gap="md">
+          <Group gap="sm">
             <Text size="sm" c="dimmed">
               <IconClock size={16} style={{ verticalAlign: -3 }} />
               {" "}
@@ -130,7 +150,7 @@ export default function Transactions() {
               {sortOrder === "asc" ? "升序" : "降序"}
             </Button>
           </Group>
-        </Card>
+        </Group>
 
         {result?.error
           ? <Alert color="red" title="读取失败">{result.error}</Alert>
@@ -195,6 +215,24 @@ export default function Transactions() {
           </Group>
         )}
       </Stack>
+
+      <Modal opened={addOpened} onClose={closeAdd} title="记一笔" size="lg" centered>
+        <TransactionForm onSaved={handleAdded} />
+      </Modal>
+
+      {notice && (
+        <Affix position={{ bottom: 24, right: 24 }} zIndex={400}>
+          <Notification
+            color="green"
+            icon={<IconCheck size={18} />}
+            title="保存成功"
+            closeButtonProps={{ "aria-label": "关闭提示" }}
+            onClose={() => setNotice(null)}
+          >
+            {notice.message}
+          </Notification>
+        </Affix>
+      )}
     </Container>
   );
 }

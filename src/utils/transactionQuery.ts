@@ -1,5 +1,5 @@
-import currency from "currency.js";
 import type { TransactionFilter, TransactionType } from "../shared/types";
+import { toCents } from "./format";
 
 export interface QueryValues {
   type: TransactionType | "";
@@ -31,12 +31,12 @@ export function validateQuery(values: QueryValues): QueryErrors {
   for (const field of ["minAmount", "maxAmount"] as const) {
     const amount = values[field];
     if (amount !== "" && (!/^\d+(?:\.\d{1,2})?$/.test(String(amount))
-      || !Number.isSafeInteger(currency(amount).intValue))) {
+      || !Number.isSafeInteger(toCents(amount)))) {
       errors[field] = "请输入非负金额，最多两位小数，且不能超过安全金额范围";
     }
   }
   if (!errors.minAmount && !errors.maxAmount && values.minAmount !== "" && values.maxAmount !== ""
-    && currency(values.minAmount).intValue > currency(values.maxAmount).intValue) {
+    && toCents(values.minAmount) > toCents(values.maxAmount)) {
     errors.maxAmount = "最高金额不能小于最低金额";
   }
   return errors;
@@ -49,8 +49,8 @@ export function toTransactionFilter(values: QueryValues): TransactionFilter {
     category: values.category || undefined,
     startDate: values.startDate || undefined,
     endDate: values.endDate || undefined,
-    minAmount: values.minAmount === "" ? undefined : currency(values.minAmount).intValue,
-    maxAmount: values.maxAmount === "" ? undefined : currency(values.maxAmount).intValue,
+    minAmount: values.minAmount === "" ? undefined : toCents(values.minAmount),
+    maxAmount: values.maxAmount === "" ? undefined : toCents(values.maxAmount),
     keyword: values.keyword.trim() || undefined,
   };
 }
