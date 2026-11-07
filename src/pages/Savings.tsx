@@ -19,7 +19,7 @@ import { IconPigMoney, IconPlus } from "@tabler/icons-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { savingsGoals } from "../shared/db";
 import type { SavingsGoal } from "../shared/types";
-import { formatAmount, toCents } from "../utils/format";
+import { formatAmount, parseAmountText } from "../utils/format";
 
 interface GoalCardProps {
   goal: SavingsGoal;
@@ -71,8 +71,9 @@ export default function Savings() {
   const [creating, setCreating] = useState(false);
   const [depositing, setDepositing] = useState(false);
 
-  const targetCents = typeof target === "number" ? toCents(target) : 0;
-  const depositCents = typeof depositAmount === "number" ? toCents(depositAmount) : 0;
+  // 固定两位小数时，NumberInput 可能把整数金额以带尾零的字符串返回。
+  const targetCents = parseAmountText(String(target)) ?? 0;
+  const depositCents = parseAmountText(String(depositAmount)) ?? 0;
   const canCreate = name.trim().length > 0 && Number.isSafeInteger(targetCents) && targetCents > 0;
   const canDeposit = depositGoal !== null
     && Number.isSafeInteger(depositCents)
