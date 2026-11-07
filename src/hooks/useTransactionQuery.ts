@@ -1,9 +1,16 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { transactions } from "../shared/db";
 import { DEFAULT_CATEGORIES } from "../shared/constants";
-import type { Transaction, TransactionFilter } from "../shared/types";
+import type { Transaction, TransactionFilter, TransactionQuery } from "../shared/types";
 
-export default function useTransactionQuery(filter: TransactionFilter, page = 1, pageSize = 10) {
+interface QueryOptions {
+  page: number;
+  pageSize: number;
+  sortBy: NonNullable<TransactionQuery["sortBy"]>;
+  order: NonNullable<TransactionQuery["order"]>;
+}
+
+export default function useTransactionQuery(filter: TransactionFilter, { page, pageSize, sortBy, order }: QueryOptions) {
   // 分类和总条数只订阅账单变化，不随页码或筛选条件重新读取全部账单。
   const summary = useLiveQuery(async () => {
     try {
@@ -32,8 +39,8 @@ export default function useTransactionQuery(filter: TransactionFilter, page = 1,
       const currentPage = Math.min(page, pages);
       const records = await transactions.list({
         ...filter,
-        sortBy: "date",
-        order: "desc",
+        sortBy,
+        order,
         offset: (currentPage - 1) * pageSize,
         limit: pageSize,
       });
@@ -45,7 +52,7 @@ export default function useTransactionQuery(filter: TransactionFilter, page = 1,
         error: "账单读取失败，请刷新页面重试，并确认浏览器允许本地数据存储。",
       };
     }
-  }, [filter, page, pageSize]);
+  }, [filter, page, pageSize, sortBy, order]);
 
   if (!summary || !result) return undefined;
   return { ...result, total: summary.total, categories: summary.categories, error: summary.error || result.error };
