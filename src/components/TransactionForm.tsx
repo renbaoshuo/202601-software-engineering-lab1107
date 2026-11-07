@@ -21,6 +21,7 @@ import {
   IconCalendar,
   IconCheck,
   IconDeviceFloppy,
+  IconWand,
 } from "@tabler/icons-react";
 import { useLocation, useNavigate } from "react-router";
 import { DEFAULT_CATEGORIES } from "../shared/constants";
@@ -28,6 +29,7 @@ import { transactions } from "../shared/db";
 import type { TransactionType } from "../shared/types";
 import { notifyTransactionAdded } from "../utils/events";
 import { formatAmount, formatDate, toCents } from "../utils/format";
+import { parseTransactionText } from "../utils/smartParse";
 
 interface FormErrors {
   amount?: string;
@@ -65,6 +67,9 @@ export default function TransactionForm() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [success, setSuccess] = useState<{ text: string; at: number } | null>(null);
+  const [parseText, setParseText] = useState("");
+  const [parseError, setParseError] = useState("");
+  const [parseTip, setParseTip] = useState("");
 
   useEffect(() => {
     if (!success) return;
@@ -85,6 +90,25 @@ export default function TransactionForm() {
     setAmount(template.amount / 100);
     setNote(template.note);
     setErrors({});
+    setParseTip("");
+  }
+
+  function handleParse() {
+    const result = parseTransactionText(parseText);
+    if (!result) {
+      setParseError("没听懂这句话，试试「昨天打车花了 25」");
+      setParseTip("");
+      return;
+    }
+
+    setType(result.type);
+    setCategory(result.category);
+    setAmount(result.amount / 100);
+    setDate(result.date);
+    setNote(result.note);
+    setErrors({});
+    setParseError("");
+    setParseTip(`已识别：${result.date} · ${result.category} · ${formatAmount(result.amount)}`);
   }
 
   function validate(): boolean {
@@ -151,6 +175,7 @@ export default function TransactionForm() {
         setNote("");
         setCategory(null);
         setErrors({});
+        setParseTip("");
         amountRef.current?.focus();
       }
       else {
@@ -192,6 +217,33 @@ export default function TransactionForm() {
 
       <Card withBorder radius="md" padding="lg" shadow="sm">
         <Stack gap="md">
+          <TextInput
+            label="智能识别"
+            placeholder="一句话记账，例如：昨天打车花了 25"
+            value={parseText}
+            leftSection={<IconWand size={16} />}
+            rightSectionWidth={76}
+            rightSection={(
+              <Button size="compact-sm" variant="light" onClick={handleParse}>
+                识别
+              </Button>
+            )}
+            onChange={(event) => {
+              setParseText(event.currentTarget.value);
+              setParseError("");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                handleParse();
+              }
+            }}
+            error={parseError}
+          />
+          {parseTip && (
+            <Text size="xs" c="green">{parseTip}</Text>
+          )}
+
           <SegmentedControl
             fullWidth
             value={type}
