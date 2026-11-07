@@ -1,12 +1,11 @@
 import { Loader, Progress } from "@mantine/core";
 import { useTimeout } from "@mantine/hooks";
+import currency from "currency.js";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useState, type FormEvent } from "react";
 import { budgets, transactions } from "../shared/db";
+import { formatAmount } from "../utils/format";
 import "./Budget.css";
-
-// 金额在库里统一存整数分（见 src/shared/types.ts 注释），页面输入与展示均用元
-const fenToYuan = (fen: number) => (fen / 100).toFixed(2);
 
 const monthOf = (date: string) => date.slice(0, 7);
 
@@ -78,13 +77,13 @@ export default function Budget() {
   const remaining = (editing?.amount ?? 0) - spent;
 
   // 切换月份时预填已有预算
-  function switchMonth(next: string) {
+  const switchMonth = (next: string) => {
     if (next === "") return;
     setMonth(next);
     setError("");
     const found = rows.find(row => row.month === next);
-    setDraft(found ? fenToYuan(found.amount) : "");
-  }
+    setDraft(found ? currency(found.amount, { fromCents: true }).toString() : "");
+  };
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -116,32 +115,40 @@ export default function Budget() {
   return (
     <div className="budget-page">
       <section className="budget-card">
-        <h2 className="budget-card__title">{month} 概览</h2>
-        {editing === undefined ? (
-          <p className="budget-empty">
-            这个月还没设预算，在下方设置后即可跟踪。
-          </p>
-        ) : (
-          <>
-            <div className="budget-overview">
-              <div>
-                预算 <strong>¥{fenToYuan(editing.amount)}</strong>
-              </div>
-              <div>
-                已花 <strong>¥{fenToYuan(spent)}</strong>
-              </div>
-              <div className={remaining < 0 ? "budget-negative" : undefined}>
-                剩余 <strong>¥{fenToYuan(remaining)}</strong>
-              </div>
-            </div>
-            <BudgetProgress month={month} spent={spent} amount={editing.amount} />
-            <p className="budget-bar__text">
-              {editing.amount > 0 && spent > editing.amount
-                ? "本月预算已超支！"
-                : `已使用 ${Math.round(percent(spent, editing.amount))}%`}
-            </p>
-          </>
-        )}
+        <h2 className="budget-card__title">{`${month} 概览`}</h2>
+        {editing === undefined
+          ? (
+              <p className="budget-empty">
+                这个月还没设预算，在下方设置后即可跟踪。
+              </p>
+            )
+          : (
+              <>
+                <div className="budget-overview">
+                  <div>
+                    预算
+                    {" "}
+                    <strong>{formatAmount(editing.amount)}</strong>
+                  </div>
+                  <div>
+                    已花
+                    {" "}
+                    <strong>{formatAmount(spent)}</strong>
+                  </div>
+                  <div className={remaining < 0 ? "budget-negative" : undefined}>
+                    剩余
+                    {" "}
+                    <strong>{formatAmount(remaining)}</strong>
+                  </div>
+                </div>
+                <BudgetProgress month={month} spent={spent} amount={editing.amount} />
+                <p className="budget-bar__text">
+                  {editing.amount > 0 && spent > editing.amount
+                    ? "本月预算已超支！"
+                    : `已使用 ${Math.round(percent(spent, editing.amount))}%`}
+                </p>
+              </>
+            )}
       </section>
 
       <section className="budget-card">
@@ -152,7 +159,7 @@ export default function Budget() {
             <input
               type="month"
               value={month}
-              onChange={(event) => switchMonth(event.target.value)}
+              onChange={event => switchMonth(event.target.value)}
             />
           </label>
           <label>
@@ -163,7 +170,7 @@ export default function Budget() {
               step="0.01"
               placeholder="如 3000"
               value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={event => setDraft(event.target.value)}
             />
           </label>
           <button type="submit" className="budget-button">
@@ -175,54 +182,56 @@ export default function Budget() {
 
       <section className="budget-card">
         <h2 className="budget-card__title">历史预算</h2>
-        {rows.length === 0 ? (
-          <p className="budget-empty">还没有任何预算记录。</p>
-        ) : (
-          <table className="budget-table">
-            <thead>
-              <tr>
-                <th>月份</th>
-                <th>预算</th>
-                <th>已花</th>
-                <th>进度</th>
-                <th>剩余</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const rowSpent = spendMap[row.month] ?? 0;
-                const rowLeft = row.amount - rowSpent;
-                return (
-                  <tr key={row.month}>
-                    <td>{row.month}</td>
-                    <td>¥{fenToYuan(row.amount)}</td>
-                    <td>¥{fenToYuan(rowSpent)}</td>
-                    <td>
-                      <BudgetProgress month={row.month} spent={rowSpent} amount={row.amount} compact />
-                    </td>
-                    <td className={rowLeft < 0 ? "budget-negative" : undefined}>
-                      <strong>¥{fenToYuan(rowLeft)}</strong>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className={
-                          confirmId === row.month
-                            ? "budget-button budget-button--danger"
-                            : "budget-button budget-button--ghost"
-                        }
-                        onClick={() => removeOne(row.month)}
-                      >
-                        {confirmId === row.month ? "确认删除？" : "删除"}
-                      </button>
-                    </td>
+        {rows.length === 0
+          ? (
+              <p className="budget-empty">还没有任何预算记录。</p>
+            )
+          : (
+              <table className="budget-table">
+                <thead>
+                  <tr>
+                    <th>月份</th>
+                    <th>预算</th>
+                    <th>已花</th>
+                    <th>进度</th>
+                    <th>剩余</th>
+                    <th>操作</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+                </thead>
+                <tbody>
+                  {rows.map((row) => {
+                    const rowSpent = spendMap[row.month] ?? 0;
+                    const rowLeft = row.amount - rowSpent;
+                    return (
+                      <tr key={row.month}>
+                        <td>{row.month}</td>
+                        <td>{formatAmount(row.amount)}</td>
+                        <td>{formatAmount(rowSpent)}</td>
+                        <td>
+                          <BudgetProgress month={row.month} spent={rowSpent} amount={row.amount} compact />
+                        </td>
+                        <td className={rowLeft < 0 ? "budget-negative" : undefined}>
+                          <strong>{formatAmount(rowLeft)}</strong>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className={
+                              confirmId === row.month
+                                ? "budget-button budget-button--danger"
+                                : "budget-button budget-button--ghost"
+                            }
+                            onClick={() => removeOne(row.month)}
+                          >
+                            {confirmId === row.month ? "确认删除？" : "删除"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
       </section>
     </div>
   );
