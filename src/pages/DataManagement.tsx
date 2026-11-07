@@ -30,7 +30,7 @@ import {
   IconUpload,
 } from "@tabler/icons-react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import BackupTable from "../components/BackupTable";
 import DataFileDrop from "../components/DataFileDrop";
 import { ledgerBackup, transactions } from "../shared/db";
@@ -159,6 +159,7 @@ export default function DataManagement() {
   const [readingImport, setReadingImport] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importConfirmOpen, setImportConfirmOpen] = useState(false);
+  const importReadId = useRef(0);
 
   const [backingUp, setBackingUp] = useState(false);
   const [viewedBackup, setViewedBackup] = useState<StoredBackup | null>(null);
@@ -169,6 +170,7 @@ export default function DataManagement() {
   const [readingRestore, setReadingRestore] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
+  const restoreReadId = useRef(0);
 
   const latestBackup = backups[0];
   const backupOptions = useMemo(
@@ -251,17 +253,21 @@ export default function DataManagement() {
   }
 
   async function handleImportFile(file: File) {
+    const readId = ++importReadId.current;
     setReadingImport(true);
     setFeedback(null);
     try {
-      setImportPreview(await readImportFile(file));
+      const preview = await readImportFile(file);
+      if (readId !== importReadId.current) return;
+      setImportPreview(preview);
     }
     catch (error) {
+      if (readId !== importReadId.current) return;
       setImportPreview(null);
       setFeedback({ type: "error", title: "读取文件失败", message: errorMessage(error) });
     }
     finally {
-      setReadingImport(false);
+      if (readId === importReadId.current) setReadingImport(false);
     }
   }
 
@@ -392,10 +398,12 @@ export default function DataManagement() {
   }
 
   async function handleRestoreFile(file: File) {
+    const readId = ++restoreReadId.current;
     setReadingRestore(true);
     setFeedback(null);
     try {
       const preview = await readImportFile(file);
+      if (readId !== restoreReadId.current) return;
       if (preview.format !== "json" || !preview.backup || preview.issues.length > 0) {
         throw new Error("恢复需要字段完整且校验通过的 JSON 备份文件");
       }
@@ -407,11 +415,12 @@ export default function DataManagement() {
       });
     }
     catch (error) {
+      if (readId !== restoreReadId.current) return;
       setRestoreCandidate(null);
       setFeedback({ type: "error", title: "备份文件无效", message: errorMessage(error) });
     }
     finally {
-      setReadingRestore(false);
+      if (readId === restoreReadId.current) setReadingRestore(false);
     }
   }
 
@@ -741,6 +750,8 @@ export default function DataManagement() {
                   fullWidth
                   value={restoreSource}
                   onChange={(value) => {
+                    restoreReadId.current += 1;
+                    setReadingRestore(false);
                     setRestoreSource(value as RestoreSource);
                     setRestoreCandidate(null);
                     setSelectedBackupId(null);
