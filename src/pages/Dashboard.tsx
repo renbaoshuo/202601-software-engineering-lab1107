@@ -12,9 +12,10 @@ import {
   IconArrowUpRight,
   IconWallet,
 } from "@tabler/icons-react";
-import { useLiveQuery } from "dexie-react-hooks";
-import type { ReactNode } from "react";
+import { liveQuery } from "dexie";
+import { useEffect, useState, type ReactNode } from "react";
 import { transactions } from "../shared/db";
+import type { Transaction } from "../shared/types";
 import { formatAmount } from "../utils/format";
 
 interface SummaryCardProps {
@@ -45,7 +46,12 @@ function SummaryCard({ title, amount, color, icon }: SummaryCardProps) {
 }
 
 export default function Dashboard() {
-  const records = useLiveQuery(() => transactions.list()) ?? [];
+  const [records, setRecords] = useState<Transaction[]>([]);
+
+  useEffect(() => {
+    const subscription = liveQuery(() => transactions.list()).subscribe(setRecords);
+    return () => subscription.unsubscribe();
+  }, []);
 
   const { totalIncome, totalExpense } = records.reduce(
     (summary, transaction) => {
