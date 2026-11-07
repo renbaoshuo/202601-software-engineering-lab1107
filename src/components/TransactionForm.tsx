@@ -23,7 +23,6 @@ import {
   IconDeviceFloppy,
   IconWand,
 } from "@tabler/icons-react";
-import { useLocation, useNavigate } from "react-router";
 import { DEFAULT_CATEGORIES } from "../shared/constants";
 import { transactions } from "../shared/db";
 import type { TransactionType } from "../shared/types";
@@ -35,6 +34,10 @@ interface FormErrors {
   amount?: string;
   category?: string;
   date?: string;
+}
+
+interface TransactionFormProps {
+  onReturn: () => void;
 }
 
 interface QuickTemplate {
@@ -54,9 +57,7 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
   { label: "工资", type: "income", category: "工资", amount: 800000, note: "工资" },
 ];
 
-export default function TransactionForm() {
-  const navigate = useNavigate();
-  const location = useLocation();
+export default function TransactionForm({ onReturn }: TransactionFormProps) {
   const amountRef = useRef<HTMLInputElement>(null);
   const [type, setType] = useState<TransactionType>("expense");
   const [amount, setAmount] = useState<number | string>("");
@@ -138,16 +139,6 @@ export default function TransactionForm() {
     return Object.keys(next).length === 0;
   }
 
-  function goBack() {
-    // 直接打开 /transactions 时没有上一页，退回账单列表。
-    if (location.key === "default") {
-      navigate("/transactions");
-    }
-    else {
-      navigate(-1);
-    }
-  }
-
   async function handleSave(continueAdding: boolean) {
     if (!validate()) return;
 
@@ -179,7 +170,7 @@ export default function TransactionForm() {
         amountRef.current?.focus();
       }
       else {
-        goBack();
+        onReturn();
       }
     }
     catch {
