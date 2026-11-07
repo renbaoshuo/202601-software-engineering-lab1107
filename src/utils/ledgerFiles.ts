@@ -328,13 +328,18 @@ export function createJson(snapshot: LedgerBackup): string {
   return JSON.stringify(snapshot, null, 2);
 }
 
+function escapeCsvFormula(value: string): string {
+  // 表格软件会把部分前导字符当作公式执行，导出用户文本时强制转为普通文本。
+  return /^[\t\r]|^\s*[=+\-@]/.test(value) ? `'${value}` : value;
+}
+
 export function createCsv(transactions: Transaction[]): string {
   const rows = transactions.map(transaction => ({
     类型: transaction.type === "income" ? "收入" : "支出",
     金额: formatCsvAmount(transaction.amount),
-    分类: transaction.category,
+    分类: escapeCsvFormula(transaction.category),
     日期: transaction.date,
-    备注: transaction.note,
+    备注: escapeCsvFormula(transaction.note),
   }));
   return `\uFEFF${Papa.unparse(rows, { columns: CSV_COLUMNS, newline: "\r\n" })}`;
 }
