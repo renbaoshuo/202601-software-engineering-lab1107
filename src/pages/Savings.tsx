@@ -16,20 +16,14 @@ import {
 } from "@mantine/core";
 import PageContainer from "../components/PageContainer";
 import { IconPigMoney, IconPlus } from "@tabler/icons-react";
-import currency from "currency.js";
 import { useLiveQuery } from "dexie-react-hooks";
 import { savingsGoals } from "../shared/db";
 import type { SavingsGoal } from "../shared/types";
-import { formatAmount } from "../utils/format";
+import { formatAmount, toCents } from "../utils/format";
 
 interface GoalCardProps {
   goal: SavingsGoal;
   onDeposit: () => void;
-}
-
-// 输入框以元为单位，入库前统一转成整数分。
-function toCents(yuan: number) {
-  return currency(yuan).intValue;
 }
 
 // 目标金额在数据层可能为 0（如恢复外部备份），兜底避免算出 NaN 破坏进度条。
@@ -77,10 +71,12 @@ export default function Savings() {
   const [creating, setCreating] = useState(false);
   const [depositing, setDepositing] = useState(false);
 
-  const canCreate = name.trim().length > 0 && typeof target === "number" && target > 0;
+  const targetCents = typeof target === "number" ? toCents(target) : 0;
+  const depositCents = typeof depositAmount === "number" ? toCents(depositAmount) : 0;
+  const canCreate = name.trim().length > 0 && Number.isSafeInteger(targetCents) && targetCents > 0;
   const canDeposit = depositGoal !== null
-    && typeof depositAmount === "number"
-    && depositAmount > 0;
+    && Number.isSafeInteger(depositCents)
+    && depositCents > 0;
 
   function closeCreate() {
     setCreateOpen(false);
@@ -89,11 +85,11 @@ export default function Savings() {
   }
 
   async function handleCreate() {
-    if (creating || typeof target !== "number" || !name.trim() || target <= 0) return;
+    if (creating || !canCreate) return;
     // 写入期间锁住按钮，避免连点重复创建目标。
     setCreating(true);
     try {
-      await savingsGoals.add({ name: name.trim(), targetAmount: toCents(target) });
+      await savingsGoals.add({ name: name.trim(), targetAmount: targetCents });
       closeCreate();
     }
     finally {
@@ -107,11 +103,11 @@ export default function Savings() {
   }
 
   async function handleDeposit() {
-    if (depositing || !depositGoal || typeof depositAmount !== "number" || depositAmount <= 0) return;
+    if (depositing || !depositGoal || !canDeposit) return;
     // 存入是累加操作，写入期间重复提交会把同一笔钱记多次。
     setDepositing(true);
     try {
-      await savingsGoals.deposit(depositGoal.id, toCents(depositAmount));
+      await savingsGoals.deposit(depositGoal.id, depositCents);
       closeDeposit();
     }
     finally {

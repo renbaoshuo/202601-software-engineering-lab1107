@@ -1,18 +1,17 @@
 import { Loader, Progress, Table } from "@mantine/core";
 import PageContainer from "../components/PageContainer";
 import { useTimeout } from "@mantine/hooks";
-import currency from "currency.js";
+import { format } from "date-fns";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useState, type FormEvent } from "react";
 import { budgets, transactions } from "../shared/db";
-import { formatAmount } from "../utils/format";
+import { formatAmount, fromCents, toCents } from "../utils/format";
 import "./Budget.css";
 
 const monthOf = (date: string) => date.slice(0, 7);
 
 function currentMonth() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return format(new Date(), "yyyy-MM");
 }
 
 interface BudgetProgressProps {
@@ -87,17 +86,17 @@ export default function Budget() {
     setMonth(next);
     setError("");
     const found = rows.find(row => row.month === next);
-    setDraft(found ? currency(found.amount, { fromCents: true }).toString() : "");
+    setDraft(found ? String(fromCents(found.amount)) : "");
   };
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    const yuan = Number(draft);
-    if (draft.trim() === "" || !Number.isFinite(yuan) || yuan <= 0) {
-      setError("请输入大于 0 的金额");
+    const amount = toCents(Number(draft));
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      setError("请输入大于 0 且在可记录范围内的金额");
       return;
     }
-    await budgets.set({ month, amount: Math.round(yuan * 100) });
+    await budgets.set({ month, amount });
     setDraft("");
     setError("");
   }
