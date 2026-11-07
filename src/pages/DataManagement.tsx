@@ -65,7 +65,7 @@ type ExportScope = "all" | "month" | "custom";
 type RestoreSource = "library" | "file";
 
 interface Feedback {
-  type: "success" | "error";
+  type: "success" | "warning" | "error";
   title: string;
   message: string;
 }
@@ -96,6 +96,17 @@ const CSV_SCOPES = [
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "发生未知错误";
+}
+
+function feedbackColor(type: Feedback["type"]) {
+  switch (type) {
+    case "success":
+      return "teal";
+    case "warning":
+      return "yellow";
+    case "error":
+      return "red";
+  }
 }
 
 function SnapshotCounts({ transactions, budgets, savingsGoals }: SnapshotCountsProps) {
@@ -290,24 +301,24 @@ export default function DataManagement() {
       const expectedGoals = importMode === "append" || preview.format === "csv"
         ? before.savingsGoals.length
         : preview.savingsGoals.length;
-      if (
+      const countsMatch = (
         after.transactions.length !== expectedTransactions
         || after.budgets.length !== expectedBudgets
         || after.savingsGoals.length !== expectedGoals
-      ) {
-        await ledgerBackup.restore(before);
-        throw new Error("写入后的记录数量校验失败，原数据已回滚");
-      }
+      ) === false;
 
       refreshBackups();
       setImportPreview(null);
       setImportConfirmOpen(false);
+      const message = `已${importMode === "append" ? "追加" : "覆盖"}导入 ${preview.transactions.length} 条账单`
+        + (preview.issues.length > 0 ? `，跳过 ${preview.issues.length} 个错误项` : "")
+        + (importMode === "overwrite" ? "，覆盖前数据已自动备份" : "");
       setFeedback({
-        type: "success",
-        title: "导入成功",
-        message: `已${importMode === "append" ? "追加" : "覆盖"}导入 ${preview.transactions.length} 条账单`
-          + (preview.issues.length > 0 ? `，跳过 ${preview.issues.length} 个错误项` : "")
-          + (importMode === "overwrite" ? "，覆盖前数据已自动备份" : ""),
+        type: countsMatch ? "success" : "warning",
+        title: countsMatch ? "导入成功" : "导入完成，数量校验有变化",
+        message: countsMatch
+          ? message
+          : `${message}。提交后记录数发生变化；为避免覆盖并发保存，未执行整库回滚`,
       });
     }
     catch (error) {
@@ -414,21 +425,20 @@ export default function DataManagement() {
       await ledgerBackup.restore(restoreCandidate.snapshot);
       const after = await ledgerBackup.read();
       const target = restoreCandidate.snapshot;
-      if (
+      const countsMatch = (
         after.transactions.length !== target.transactions.length
         || after.budgets.length !== target.budgets.length
         || after.savingsGoals.length !== target.savingsGoals.length
-      ) {
-        await ledgerBackup.restore(before);
-        throw new Error("恢复后的记录数量校验失败，原数据已回滚");
-      }
+      ) === false;
 
       refreshBackups();
       setRestoreConfirmOpen(false);
       setFeedback({
-        type: "success",
-        title: "恢复成功",
-        message: `已从 ${restoreCandidate.name} 恢复 ${target.transactions.length} 条账单，恢复前数据已自动备份`,
+        type: countsMatch ? "success" : "warning",
+        title: countsMatch ? "恢复成功" : "恢复完成，数量校验有变化",
+        message: countsMatch
+          ? `已从 ${restoreCandidate.name} 恢复 ${target.transactions.length} 条账单，恢复前数据已自动备份`
+          : `已从 ${restoreCandidate.name} 恢复 ${target.transactions.length} 条账单；提交后记录数发生变化，未执行整库回滚以保留并发保存`,
       });
     }
     catch (error) {
@@ -457,7 +467,7 @@ export default function DataManagement() {
 
         {feedback && (
           <Alert
-            color={feedback.type === "success" ? "teal" : "red"}
+            color={feedbackColor(feedback.type)}
             icon={feedback.type === "success"
               ? <IconCircleCheck size={22} />
               : <IconAlertTriangle size={22} />}
