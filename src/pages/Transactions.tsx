@@ -64,6 +64,9 @@ export default function Transactions() {
     order: showRecent ? "desc" : sortOrder,
   });
 
+  // 列表内容变化后重新选择，避免批量删除包含不可见的账单。
+  const visibleRowsKey = result?.records.map(record => record.id).join(",");
+
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(null), 3500);
@@ -170,7 +173,7 @@ export default function Transactions() {
                       )
                     : (
                         <TransactionTable
-                          key={result.records.map(record => record.id).join(",")}
+                          key={visibleRowsKey}
                           records={result.records}
                           onEdit={transaction => setForm({ transaction })}
                           onDeleted={count => setNotice({ message: `已删除 ${count} 笔账单` })}

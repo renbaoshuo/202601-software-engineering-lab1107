@@ -74,9 +74,10 @@ export default function TransactionForm({ transaction, onCancel, onSaved }: Tran
     : categories;
 
   function changeType(value: string) {
-    setType(value as TransactionType);
-    // 分类按收支类型分组，切换后原分类可能不在新列表里。
-    setCategory(null);
+    const nextType = value as TransactionType;
+    setType(nextType);
+    // 只有新类型也支持的类别才可以沿用。
+    if (!category || !DEFAULT_CATEGORIES[nextType].includes(category)) setCategory(null);
     setErrors(prev => ({ ...prev, category: undefined }));
   }
 
