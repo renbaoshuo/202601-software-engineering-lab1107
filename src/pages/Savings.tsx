@@ -24,6 +24,7 @@ import { formatAmount } from "../utils/format";
 
 interface GoalCardProps {
   goal: SavingsGoal;
+  onDeposit: () => void;
 }
 
 // 输入框以元为单位，入库前统一转成整数分。
@@ -38,7 +39,7 @@ function getPercent(goal: SavingsGoal) {
     : 0;
 }
 
-function GoalCard({ goal }: GoalCardProps) {
+function GoalCard({ goal, onDeposit }: GoalCardProps) {
   const percent = getPercent(goal);
   const amounts = `已存 ${formatAmount(goal.savedAmount)} / 目标 ${formatAmount(goal.targetAmount)}`;
 
@@ -58,6 +59,7 @@ function GoalCard({ goal }: GoalCardProps) {
           color={percent >= 100 ? "teal" : "indigo"}
         />
         <Text size="sm" fw={500}>{`${percent}%`}</Text>
+        <Button variant="light" fullWidth onClick={onDeposit}>存入</Button>
       </Stack>
     </Card>
   );
@@ -68,8 +70,13 @@ export default function Savings() {
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [target, setTarget] = useState<string | number>("");
+  const [depositGoal, setDepositGoal] = useState<SavingsGoal | null>(null);
+  const [depositAmount, setDepositAmount] = useState<string | number>("");
 
   const canCreate = name.trim().length > 0 && typeof target === "number" && target > 0;
+  const canDeposit = depositGoal !== null
+    && typeof depositAmount === "number"
+    && depositAmount > 0;
 
   function closeCreate() {
     setCreateOpen(false);
@@ -81,6 +88,17 @@ export default function Savings() {
     if (typeof target !== "number" || !name.trim() || target <= 0) return;
     await savingsGoals.add({ name: name.trim(), targetAmount: toCents(target) });
     closeCreate();
+  }
+
+  function closeDeposit() {
+    setDepositGoal(null);
+    setDepositAmount("");
+  }
+
+  async function handleDeposit() {
+    if (!depositGoal || typeof depositAmount !== "number" || depositAmount <= 0) return;
+    await savingsGoals.deposit(depositGoal.id, toCents(depositAmount));
+    closeDeposit();
   }
 
   let content: ReactNode;
@@ -101,7 +119,9 @@ export default function Savings() {
   else {
     content = (
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
-        {goals.map(goal => <GoalCard key={goal.id} goal={goal} />)}
+        {goals.map(goal => (
+          <GoalCard key={goal.id} goal={goal} onDeposit={() => setDepositGoal(goal)} />
+        ))}
       </SimpleGrid>
     );
   }
@@ -135,6 +155,27 @@ export default function Savings() {
             onChange={setTarget}
           />
           <Button disabled={!canCreate} onClick={handleCreate}>创建</Button>
+        </Stack>
+      </Modal>
+      <Modal
+        opened={depositGoal !== null}
+        onClose={closeDeposit}
+        title={`存入 · ${depositGoal?.name ?? ""}`}
+        centered
+      >
+        <Stack gap="md">
+          <NumberInput
+            label="存入金额（元）"
+            placeholder="0.00"
+            min={0.01}
+            decimalScale={2}
+            fixedDecimalScale
+            leftSection="¥"
+            value={depositAmount}
+            onChange={setDepositAmount}
+            data-autofocus
+          />
+          <Button disabled={!canDeposit} onClick={handleDeposit}>确认存入</Button>
         </Stack>
       </Modal>
     </Container>
