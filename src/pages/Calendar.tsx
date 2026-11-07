@@ -19,7 +19,10 @@ import { transactions } from "../shared/db";
 import type { TransactionType } from "../shared/types";
 import { formatAmount, parseDate } from "../utils/format";
 
-const today = format(new Date(), "yyyy-MM-dd");
+// 写成函数而不是模块级常量：页面重新挂载时才能拿到当天日期，避免跨天后仍显示旧日期。
+function today() {
+  return format(new Date(), "yyyy-MM-dd");
+}
 
 // 日历数字用圆体：优先 Windows 自带幼圆，macOS 用圆体-简，缺失时退回 Comic Sans。
 const DAY_FONT = {
@@ -41,8 +44,11 @@ const CATEGORY_EMOJI: Record<string, string> = {
 };
 
 // CSV 导入可能带来自定义分类，按收支方向兜底，避免出现空白图标。
+// 用 hasOwn 判定自有属性：分类名可能是 __proto__ 之类的继承属性，直接索引会取到原型对象导致渲染崩溃。
 function categoryEmoji(category: string, type: TransactionType) {
-  return CATEGORY_EMOJI[category] ?? (type === "income" ? "💰" : "🧾");
+  return Object.hasOwn(CATEGORY_EMOJI, category)
+    ? CATEGORY_EMOJI[category]
+    : (type === "income" ? "💰" : "🧾");
 }
 
 interface DailyStat {
@@ -96,6 +102,7 @@ function StatCard({ label, amount, color }: StatCardProps) {
 }
 
 export default function Calendar() {
+  // useState 传函数会走惰性初始化，只在挂载时取一次当天日期。
   const [visibleMonth, setVisibleMonth] = useState(today);
   const [selectedDate, setSelectedDate] = useState(today);
 
