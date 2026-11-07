@@ -8,8 +8,12 @@ export function formatAmount(cents: number): string {
 }
 
 // 表单里的金额以「元」输入，写入存储前统一转成整数分。
-export function toCents(amount: number): number {
+export function toCents(amount: number | string): number {
   return currency(amount).intValue;
+}
+
+export function fromCents(cents: number): number {
+  return currency(cents, { fromCents: true }).value;
 }
 
 // 账单日期统一落成本地 YYYY-MM-DD，不能用 toISOString 以免时区偏移。

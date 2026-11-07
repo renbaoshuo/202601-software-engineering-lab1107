@@ -11,8 +11,6 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import { DatePickerInput } from "@mantine/dates";
-import "@mantine/dates/styles.css";
 import {
   IconArrowLeft,
   IconBolt,
@@ -23,8 +21,7 @@ import {
 import { DEFAULT_CATEGORIES } from "../shared/constants";
 import { transactions } from "../shared/db";
 import type { NewTransaction, TransactionType } from "../shared/types";
-import { notifyTransactionAdded } from "../utils/events";
-import { formatAmount, formatDate, toCents } from "../utils/format";
+import { formatAmount, formatDate, fromCents, toCents } from "../utils/format";
 import { parseTransactionText } from "../utils/smartParse";
 
 interface FormErrors {
@@ -59,7 +56,7 @@ export default function TransactionForm({ onSaved }: TransactionFormProps) {
   const [type, setType] = useState<TransactionType>("expense");
   const [amount, setAmount] = useState<number | string>("");
   const [category, setCategory] = useState<string | null>(null);
-  const [date, setDate] = useState<string | null>(formatDate(new Date()));
+  const [date, setDate] = useState(() => formatDate(new Date()));
   const [note, setNote] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
@@ -78,7 +75,7 @@ export default function TransactionForm({ onSaved }: TransactionFormProps) {
   function applyTemplate(template: QuickTemplate) {
     setType(template.type);
     setCategory(template.category);
-    setAmount(template.amount / 100);
+    setAmount(fromCents(template.amount));
     setNote(template.note);
     setErrors({});
     setParseTip("");
@@ -94,7 +91,7 @@ export default function TransactionForm({ onSaved }: TransactionFormProps) {
 
     setType(result.type);
     setCategory(result.category);
-    setAmount(result.amount / 100);
+    setAmount(fromCents(result.amount));
     setDate(result.date);
     setNote(result.note);
     setErrors({});
@@ -121,6 +118,9 @@ export default function TransactionForm({ onSaved }: TransactionFormProps) {
     else if (!/^\d+(\.\d{1,2})?$/.test(String(amount))) {
       next.amount = "金额最多保留两位小数";
     }
+    else if (!Number.isSafeInteger(toCents(value))) {
+      next.amount = "金额超出可记录范围";
+    }
 
     if (!category) next.category = "请选择类别";
     if (!date) next.date = "请选择日期";
@@ -130,13 +130,13 @@ export default function TransactionForm({ onSaved }: TransactionFormProps) {
   }
 
   async function handleSave(continueAdding: boolean) {
-    if (!validate()) return;
+    if (saving || !validate() || !category) return;
 
     const input = {
       type,
       amount: toCents(Number(amount)),
-      category: category!,
-      date: date!,
+      category,
+      date,
       note: note.trim(),
     };
 
@@ -144,7 +144,6 @@ export default function TransactionForm({ onSaved }: TransactionFormProps) {
     setSaveError("");
     try {
       await transactions.add(input);
-      notifyTransactionAdded(input);
 
       if (continueAdding) {
         // 连续记账保留日期与收支类型，只清空本笔业务字段并聚焦金额。
@@ -232,14 +231,12 @@ export default function TransactionForm({ onSaved }: TransactionFormProps) {
           />
 
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-            <DatePickerInput
+            <TextInput
               label="日期"
-              placeholder="选择日期"
-              valueFormat="YYYY-MM-DD"
+              type="date"
               leftSection={<IconCalendar size={16} />}
               value={date}
-              onChange={setDate}
-              allowDeselect={false}
+              onChange={event => setDate(event.currentTarget.value)}
               error={errors.date}
             />
             <NumberInput
