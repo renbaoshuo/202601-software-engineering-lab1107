@@ -270,6 +270,7 @@ export default function DataManagement() {
     setImporting(true);
     setFeedback(null);
     const preview = importPreview;
+    const hasFullBackup = preview.format === "json" && preview.backup !== undefined;
 
     try {
       const before = await ledgerBackup.read();
@@ -280,7 +281,7 @@ export default function DataManagement() {
       if (importMode === "append") {
         await transactions.addMany(preview.transactions);
       }
-      else if (preview.format === "json" && preview.backup) {
+      else if (hasFullBackup && preview.backup) {
         await ledgerBackup.restore(preview.backup);
       }
       else {
@@ -295,10 +296,10 @@ export default function DataManagement() {
       const expectedTransactions = importMode === "append"
         ? before.transactions.length + preview.transactions.length
         : preview.transactions.length;
-      const expectedBudgets = importMode === "append" || preview.format === "csv"
+      const expectedBudgets = importMode === "append" || !hasFullBackup
         ? before.budgets.length
         : preview.budgets.length;
-      const expectedGoals = importMode === "append" || preview.format === "csv"
+      const expectedGoals = importMode === "append" || !hasFullBackup
         ? before.savingsGoals.length
         : preview.savingsGoals.length;
       const countsMatch = (
