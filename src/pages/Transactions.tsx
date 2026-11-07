@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -16,11 +17,11 @@ import {
 import {
   IconArrowsSort,
   IconClock,
-  IconList,
 } from "@tabler/icons-react";
-import { useLiveQuery } from "dexie-react-hooks";
+import TransactionQuery from "../components/TransactionQuery";
+import useTransactionQuery from "../hooks/useTransactionQuery";
 import { transactions } from "../shared/db";
-import type { NewTransaction } from "../shared/types";
+import type { NewTransaction, TransactionFilter, TransactionQuery as Query } from "../shared/types";
 import { formatAmount } from "../utils/format";
 
 const PAGE_SIZE = 8;
@@ -39,27 +40,22 @@ const DEMO_TRANSACTIONS: NewTransaction[] = [
   { type: "expense", amount: 2500, category: "饮食", date: "2026-10-29", note: "早餐" },
 ];
 
-type SortField = "date" | "amount";
-type SortOrder = "asc" | "desc";
+type SortField = NonNullable<Query["sortBy"]>;
+type SortOrder = NonNullable<Query["order"]>;
 
 export default function Transactions() {
+  const [filter, setFilter] = useState<TransactionFilter>({});
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [page, setPage] = useState(1);
   const [showRecent, setShowRecent] = useState(false);
 
-  const total = useLiveQuery(() => transactions.count());
-  const totalPages = Math.max(1, Math.ceil((total ?? 0) / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const pageData = useLiveQuery(
-    () => transactions.list({
-      sortBy: showRecent ? "date" : sortField,
-      order: showRecent ? "desc" : sortOrder,
-      offset: showRecent ? 0 : (currentPage - 1) * PAGE_SIZE,
-      limit: showRecent ? 5 : PAGE_SIZE,
-    }),
-    [sortField, sortOrder, currentPage, showRecent],
-  );
+  const result = useTransactionQuery(filter, {
+    page: showRecent ? 1 : page,
+    pageSize: showRecent ? 5 : PAGE_SIZE,
+    sortBy: showRecent ? "date" : sortField,
+    order: showRecent ? "desc" : sortOrder,
+  });
 
   function handleSortFieldChange(value: string | null) {
     if (value) {
@@ -83,7 +79,7 @@ export default function Transactions() {
     <Container size="lg">
       <Stack gap="md">
         <Group justify="space-between">
-          <Title order={2}>账单流水</Title>
+          <Title order={2}>账单</Title>
           <SegmentedControl
             value={showRecent ? "recent" : "all"}
             onChange={(v) => {
@@ -96,6 +92,14 @@ export default function Transactions() {
             ]}
           />
         </Group>
+
+        <TransactionQuery
+          categories={result?.categories ?? []}
+          onSearch={(nextFilter) => {
+            setFilter(nextFilter);
+            setPage(1);
+          }}
+        />
 
         {/* 排序控制区 */}
         <Card withBorder padding="sm">
@@ -128,82 +132,68 @@ export default function Transactions() {
           </Group>
         </Card>
 
-        {/* 账单列表 */}
-        <Card withBorder padding={0}>
-          {pageData === undefined
-            ? (
-                <Text ta="center" c="dimmed" py="xl">
-                  加载中…
-                </Text>
-              )
-            : pageData.length === 0
-              ? (
-                  <Stack align="center" py="xl" gap="sm">
-                    <Text c="dimmed">暂无账单记录</Text>
-                    <Button size="sm" variant="light" onClick={loadDemoData}>
-                      加载示例数据（测试用）
-                    </Button>
-                  </Stack>
-                )
-              : (
-                  <Table.ScrollContainer minWidth={500}>
-                    <Table striped highlightOnHover>
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th>日期</Table.Th>
-                          <Table.Th>类别</Table.Th>
-                          <Table.Th>备注</Table.Th>
-                          <Table.Th ta="right">金额</Table.Th>
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {pageData.map(t => (
-                          <Table.Tr key={t.id}>
-                            <Table.Td>{t.date}</Table.Td>
-                            <Table.Td>
-                              <Badge color={t.type === "income" ? "green" : "gray"} variant="light">
-                                {t.category}
-                              </Badge>
-                            </Table.Td>
-                            <Table.Td>{t.note || "—"}</Table.Td>
-                            <Table.Td ta="right">
-                              <Text fw={600} c={t.type === "income" ? "green" : "red"}>
-                                {`${t.type === "income" ? "+" : "-"}${formatAmount(t.amount)}`}
-                              </Text>
-                            </Table.Td>
-                          </Table.Tr>
-                        ))}
-                      </Table.Tbody>
-                    </Table>
-                  </Table.ScrollContainer>
-                )}
-        </Card>
+        {result?.error
+          ? <Alert color="red" title="读取失败">{result.error}</Alert>
+          : (
+              <Card withBorder padding={0}>
+                {!result
+                  ? <Text role="status" ta="center" c="dimmed" py="xl">正在加载账单…</Text>
+                  : result.records.length === 0
+                    ? (
+                        <Stack align="center" py="xl" gap="sm">
+                          <Text c="dimmed">{result.total === 0 ? "暂无账单记录" : "暂无符合条件的账单"}</Text>
+                          {result.total === 0 && (
+                            <Button size="sm" variant="light" onClick={loadDemoData}>加载示例数据</Button>
+                          )}
+                        </Stack>
+                      )
+                    : (
+                        <Table.ScrollContainer minWidth={560}>
+                          <Table striped highlightOnHover>
+                            <Table.Thead>
+                              <Table.Tr>
+                                <Table.Th>日期</Table.Th>
+                                <Table.Th>收支类型</Table.Th>
+                                <Table.Th>类别</Table.Th>
+                                <Table.Th>备注</Table.Th>
+                                <Table.Th ta="right">金额</Table.Th>
+                              </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                              {result.records.map(record => (
+                                <Table.Tr key={record.id}>
+                                  <Table.Td>{record.date}</Table.Td>
+                                  <Table.Td>
+                                    <Badge color={record.type === "income" ? "green" : "red"} variant="light">
+                                      {record.type === "income" ? "收入" : "支出"}
+                                    </Badge>
+                                  </Table.Td>
+                                  <Table.Td>{record.category}</Table.Td>
+                                  <Table.Td>{record.note || "—"}</Table.Td>
+                                  <Table.Td ta="right">
+                                    <Text fw={600} c={record.type === "income" ? "green" : "red"}>
+                                      {`${record.type === "income" ? "+" : "-"}${formatAmount(record.amount)}`}
+                                    </Text>
+                                  </Table.Td>
+                                </Table.Tr>
+                              ))}
+                            </Table.Tbody>
+                          </Table>
+                        </Table.ScrollContainer>
+                      )}
+              </Card>
+            )}
 
-        {/* 分页 */}
-        {!showRecent && pageData && pageData.length > 0 && (
-          <Group justify="center">
-            <Pagination
-              value={currentPage}
-              onChange={setPage}
-              total={totalPages}
-              siblings={1}
-            />
+        {result && !result.error && (
+          <Group justify="space-between">
+            <Text role="status" size="sm" c="dimmed">
+              {`匹配 ${result.count} 条，共 ${result.total} 条账单${showRecent ? "（展示最近 5 条）" : ""}`}
+            </Text>
+            {!showRecent && result.pages > 1 && (
+              <Pagination total={result.pages} value={result.page} onChange={setPage} />
+            )}
           </Group>
         )}
-
-        {/* 统计信息 */}
-        <Group justify="space-between">
-          <Text size="sm" c="dimmed">
-            <IconList size={16} style={{ verticalAlign: -3 }} />
-            {" "}
-            共
-            {" "}
-            {total ?? 0}
-            {" "}
-            条记录
-            {showRecent ? "（展示最近 5 条）" : `，第 ${currentPage}/${totalPages} 页`}
-          </Text>
-        </Group>
       </Stack>
     </Container>
   );
