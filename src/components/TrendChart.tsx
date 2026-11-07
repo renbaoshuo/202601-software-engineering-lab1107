@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Box, Card, Center, Group, Loader, SegmentedControl, Stack, Text, Title } from "@mantine/core";
+import { Box, Card, Center, Group, Loader, SegmentedControl, Skeleton, Stack, Text, Title } from "@mantine/core";
 import { useInterval } from "@mantine/hooks";
-import { IconTrendingUp } from "@tabler/icons-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { endOfMonth, endOfWeek, format, startOfMonth, startOfWeek, subDays, subMonths, subWeeks } from "date-fns";
 import * as echarts from "echarts";
@@ -166,44 +165,37 @@ export default function TrendChart() {
     };
   }, [buckets, dimension, totals]);
 
-  if (bills === undefined) {
-    return (
-      <Card withBorder radius="md" padding="lg">
-        <Center h={320}>
-          <Loader size="sm" />
-        </Center>
-      </Card>
-    );
-  }
-
   return (
-    <Stack gap="md">
-      <Group justify="space-between" align="center">
-        <Group gap="xs">
-          <IconTrendingUp size={20} stroke={1.6} />
-          <Title order={4}>收支趋势</Title>
+    <Card withBorder padding="lg" radius="md">
+      <Stack>
+        <Group justify="space-between">
+          <Title order={3}>收支趋势</Title>
+          <SegmentedControl
+            aria-label="时间维度"
+            data={DIMENSION_OPTIONS}
+            value={dimension}
+            onChange={value => setDimension(value as Dimension)}
+          />
         </Group>
-        <SegmentedControl
-          size="xs"
-          data={DIMENSION_OPTIONS}
-          value={dimension}
-          onChange={value => setDimension(value as Dimension)}
-        />
-      </Group>
-      <Group grow>
-        <Card withBorder radius="md" padding="sm">
-          <Text size="xs" c="dimmed">收入合计</Text>
-          <Text size="xl" fw={600} c="teal.7">{formatAmount(totals.income)}</Text>
-        </Card>
-        <Card withBorder radius="md" padding="sm">
-          <Text size="xs" c="dimmed">支出合计</Text>
-          <Text size="xl" fw={600} c="red.7">{formatAmount(totals.expense)}</Text>
-        </Card>
-      </Group>
-      <Card withBorder radius="md" padding="md">
-        <EChart option={option} />
-      </Card>
-    </Stack>
+        <Group gap="xl" align="flex-start">
+          <Stack gap={4}>
+            <Text size="sm" c="dimmed">收入合计</Text>
+            {bills === undefined
+              ? <Skeleton height={31} width={84} />
+              : <Text size="xl" fw={600} c="teal.7" style={{ fontVariantNumeric: "tabular-nums" }}>{formatAmount(totals.income)}</Text>}
+          </Stack>
+          <Stack gap={4}>
+            <Text size="sm" c="dimmed">支出合计</Text>
+            {bills === undefined
+              ? <Skeleton height={31} width={84} />
+              : <Text size="xl" fw={600} c="red.7" style={{ fontVariantNumeric: "tabular-nums" }}>{formatAmount(totals.expense)}</Text>}
+          </Stack>
+        </Group>
+        {bills === undefined
+          ? <Center h={320}><Loader aria-label="正在读取收支趋势" size="sm" /></Center>
+          : <EChart option={option} />}
+      </Stack>
+    </Card>
   );
 }
 

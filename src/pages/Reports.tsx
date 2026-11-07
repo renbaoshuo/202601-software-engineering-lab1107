@@ -1,16 +1,16 @@
-import { Container, Stack, Text, Title } from "@mantine/core";
+import { Stack, Text, Title } from "@mantine/core";
+import CategoryAnalysis from "../components/CategoryAnalysis";
 import TrendChart from "../components/TrendChart";
 
 export default function Reports() {
   return (
-    <Container size="lg" py="md">
-      <Stack gap="lg">
-        <div>
-          <Title order={2}>统计分析</Title>
-          <Text c="dimmed" mt={4}>收支趋势按当前账单实时汇总，无需手动刷新。</Text>
-        </div>
-        <TrendChart />
+    <Stack gap="xl">
+      <Stack gap={4}>
+        <Title order={2}>统计分析</Title>
+        <Text c="dimmed">查看近期收支趋势和全部支出的分类占比，账单变化后自动更新。</Text>
       </Stack>
-    </Container>
+      <TrendChart />
+      <CategoryAnalysis />
+    </Stack>
   );
 }
