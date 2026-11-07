@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Box, Card, Center, Group, Loader, SegmentedControl, Stack, Title } from "@mantine/core";
+import { Box, Card, Center, Group, Loader, SegmentedControl, Stack, Text, Title } from "@mantine/core";
 import { useInterval } from "@mantine/hooks";
 import { IconTrendingUp } from "@tabler/icons-react";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -94,7 +94,8 @@ export default function TrendChart() {
   const [dimension, setDimension] = useState<Dimension>("day");
   // 图表窗口以本地日期为准，跨过午夜后要自动推进到新的一天。
   const [todayText, setTodayText] = useState(() => format(new Date(), "yyyy-MM-dd"));
-  useInterval(() => setTodayText(format(new Date(), "yyyy-MM-dd")), 60_000);
+  // useInterval 默认不会自动启动，必须显式开启，否则跨午夜后窗口不会推进。
+  useInterval(() => setTodayText(format(new Date(), "yyyy-MM-dd")), 60_000, { autoInvoke: true });
 
   const today = useMemo(() => parseDate(todayText), [todayText]);
   const { startDate, endDate } = useMemo(() => queryRange(today, dimension), [today, dimension]);
@@ -104,16 +105,22 @@ export default function TrendChart() {
   );
   const buckets = useMemo(() => summarize(bills ?? [], dimension, today), [bills, dimension, today]);
 
+  const totals = useMemo(
+    () => buckets.reduce(
+      (sum, bucket) => ({ income: sum.income + bucket.income, expense: sum.expense + bucket.expense }),
+      { income: 0, expense: 0 },
+    ),
+    [buckets],
+  );
+
   const option = useMemo<EChartsOption>(() => {
     const peak = Math.max(0, ...buckets.map(bucket => Math.max(bucket.income, bucket.expense)));
-    const totalIncome = buckets.reduce((sum, bucket) => sum + bucket.income, 0);
-    const totalExpense = buckets.reduce((sum, bucket) => sum + bucket.expense, 0);
     return {
       // ECharts 默认不生成无障碍描述，开启后为读屏软件提供格式化后的人民币金额。
       aria: {
         enabled: true,
         label: {
-          description: `收支趋势图（${RANGE_LABEL[dimension]}），收入合计 ${formatAmount(totalIncome)}，支出合计 ${formatAmount(totalExpense)}。`,
+          description: `收支趋势图（${RANGE_LABEL[dimension]}），收入合计 ${formatAmount(totals.income)}，支出合计 ${formatAmount(totals.expense)}。`,
         },
       },
       tooltip: {
@@ -157,7 +164,7 @@ export default function TrendChart() {
         },
       ],
     };
-  }, [buckets, dimension]);
+  }, [buckets, dimension, totals]);
 
   if (bills === undefined) {
     return (
@@ -182,6 +189,16 @@ export default function TrendChart() {
           value={dimension}
           onChange={value => setDimension(value as Dimension)}
         />
+      </Group>
+      <Group grow>
+        <Card withBorder radius="md" padding="sm">
+          <Text size="xs" c="dimmed">收入合计</Text>
+          <Text size="xl" fw={600} c="teal.7">{formatAmount(totals.income)}</Text>
+        </Card>
+        <Card withBorder radius="md" padding="sm">
+          <Text size="xs" c="dimmed">支出合计</Text>
+          <Text size="xl" fw={600} c="red.7">{formatAmount(totals.expense)}</Text>
+        </Card>
       </Group>
       <Card withBorder radius="md" padding="md">
         <EChart option={option} />
