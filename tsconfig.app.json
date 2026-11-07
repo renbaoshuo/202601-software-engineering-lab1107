@@ -6,6 +6,7 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "types": [],
+    "skipLibCheck": true,
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -13,6 +14,8 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
+    // dexie-react-hooks 的类型声明引用了可选的 y-dexie/yjs，跳过三方库检查避免误报。
+    "skipLibCheck": true,
     "jsx": "react-jsx",
 
     /* Linting */
