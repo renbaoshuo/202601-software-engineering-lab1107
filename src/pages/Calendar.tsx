@@ -13,13 +13,37 @@ import {
   type MantineColor,
 } from "@mantine/core";
 import { DatePicker } from "@mantine/dates";
-import { IconArrowDownLeft, IconArrowUpRight } from "@tabler/icons-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { endOfMonth, format, startOfMonth } from "date-fns";
 import { transactions } from "../shared/db";
+import type { TransactionType } from "../shared/types";
 import { formatAmount, parseDate } from "../utils/format";
 
 const today = format(new Date(), "yyyy-MM-dd");
+
+// 日历数字用圆体：优先 Windows 自带幼圆，macOS 用圆体-简，缺失时退回 Comic Sans。
+const DAY_FONT = {
+  fontFamily: "'YouYuan', '幼圆', 'Yuanti SC', 'Comic Sans MS', sans-serif",
+  fontWeight: 600,
+};
+
+// 分类 emoji 只影响展示，分类名称仍以 shared/constants.ts 为准。
+const CATEGORY_EMOJI: Record<string, string> = {
+  饮食: "🍜",
+  交通: "🚌",
+  购物: "🛍️",
+  娱乐: "🎮",
+  医疗: "💊",
+  居住: "🏠",
+  工资: "💼",
+  奖金: "🎁",
+  理财: "📈",
+};
+
+// CSV 导入可能带来自定义分类，按收支方向兜底，避免出现空白图标。
+function categoryEmoji(category: string, type: TransactionType) {
+  return CATEGORY_EMOJI[category] ?? (type === "income" ? "💰" : "🧾");
+}
 
 interface DailyStat {
   income: number;
@@ -110,8 +134,8 @@ export default function Calendar() {
           <Text size="sm" c="dimmed">按月查看每日收支，点击日期查看当天明细</Text>
         </Box>
         <Group gap={28}>
-          <StatBlock label="本月收入" amount={monthSummary.income} color="teal" />
-          <StatBlock label="本月支出" amount={monthSummary.expense} color="red" />
+          <StatBlock label="本月收入 💰" amount={monthSummary.income} color="teal" />
+          <StatBlock label="本月支出 💸" amount={monthSummary.expense} color="red" />
         </Group>
       </Group>
 
@@ -125,14 +149,27 @@ export default function Calendar() {
             size="lg"
             fullWidth
             highlightToday
+            // 选中态默认是深蓝底白字，颜文字颜色几乎看不见，这里换成浅蓝底深蓝字。
+            getDayProps={date => (date === selectedDate
+              ? {
+                  style: {
+                    backgroundColor: "var(--mantine-color-blue-1)",
+                    color: "var(--mantine-color-blue-8)",
+                  },
+                }
+              : {})}
             renderDay={(date) => {
               const stat = dailyStats.get(date);
+              // 颜文字看当日结余（收入 - 支出）的正负，而不是有没有收支。
+              const net = stat ? stat.income - stat.expense : 0;
+              const positive = net >= 0;
               return (
                 <Stack gap={2} align="center" justify="center" h="100%">
-                  <Text size="sm">{dayOfMonth(date)}</Text>
-                  <Group gap={3} h={6}>
-                    {stat?.income ? <Box w={5} h={5} bg="teal" style={{ borderRadius: 3 }} /> : null}
-                    {stat?.expense ? <Box w={5} h={5} bg="red" style={{ borderRadius: 3 }} /> : null}
+                  <Text fz={18} lh={1.2} style={DAY_FONT}>{dayOfMonth(date)}</Text>
+                  <Group gap={4} h={12} justify="center" wrap="nowrap">
+                    {stat
+                      ? <Text fz={9} c={positive ? "teal" : "red"} lh={1.2}>{positive ? "(^▽^)" : "(T_T)"}</Text>
+                      : null}
                   </Group>
                 </Stack>
               );
@@ -147,9 +184,9 @@ export default function Calendar() {
           </Group>
 
           <SimpleGrid cols={3} spacing="sm">
-            <StatCard label="当日收入" amount={daySummary.income} color="teal" />
-            <StatCard label="当日支出" amount={daySummary.expense} color="red" />
-            <StatCard label="当日结余" amount={daySummary.income - daySummary.expense} color="indigo" />
+            <StatCard label="当日收入 💰" amount={daySummary.income} color="teal" />
+            <StatCard label="当日支出 💸" amount={daySummary.expense} color="red" />
+            <StatCard label="当日结余 🪙" amount={daySummary.income - daySummary.expense} color="indigo" />
           </SimpleGrid>
 
           {dayBills?.length
@@ -164,9 +201,7 @@ export default function Calendar() {
                             radius="md"
                             color={bill.type === "income" ? "teal" : "red"}
                           >
-                            {bill.type === "income"
-                              ? <IconArrowDownLeft size={16} />
-                              : <IconArrowUpRight size={16} />}
+                            {categoryEmoji(bill.category, bill.type)}
                           </ThemeIcon>
                           <Box>
                             <Text fw={500}>{bill.category}</Text>
