@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { liveQuery } from "dexie";
+import { useState } from "react";
 import {
   Badge,
   Button,
@@ -19,19 +18,10 @@ import {
   IconClock,
   IconList,
 } from "@tabler/icons-react";
+import { useLiveQuery } from "dexie-react-hooks";
 import { transactions } from "../shared/db";
 import type { NewTransaction } from "../shared/types";
-
-// 不依赖 dexie-react-hooks，直接用 Dexie 内置的 liveQuery 实现响应式查询
-function useLiveQuery<T>(querier: () => Promise<T> | T, deps: unknown[] = []) {
-  const [value, setValue] = useState<T | undefined>();
-  // deps 由调用方控制，querier 是闭包，无需加入依赖
-  useEffect(() => {
-    const subscription = liveQuery(querier).subscribe(setValue);
-    return () => subscription.unsubscribe();
-  }, deps);
-  return value;
-}
+import { formatAmount } from "../utils/format";
 
 const PAGE_SIZE = 8;
 
@@ -49,24 +39,6 @@ const DEMO_TRANSACTIONS: NewTransaction[] = [
   { type: "expense", amount: 2500, category: "饮食", date: "2026-10-29", note: "早餐" },
 ];
 
-// 分 -> 元，收入带 +，支出带 -
-function formatAmount(type: "income" | "expense", cents: number) {
-  const sign = type === "income" ? "+" : "-";
-  return `${sign}¥${(cents / 100).toFixed(2)}`;
-}
-
-function categoryColor(category: string): string {
-  const map: Record<string, string> = {
-    饮食: "orange",
-    交通: "blue",
-    工资: "green",
-    购物: "pink",
-    娱乐: "violet",
-    其他: "gray",
-  };
-  return map[category] ?? "gray";
-}
-
 type SortField = "date" | "amount";
 type SortOrder = "asc" | "desc";
 
@@ -76,23 +48,18 @@ export default function Transactions() {
   const [page, setPage] = useState(1);
   const [showRecent, setShowRecent] = useState(false);
 
-  // 当前页数据：用 Dexie 的 offset/limit 做服务端分页
-  const pageData = useLiveQuery(
-    () =>
-      transactions.list({
-        sortBy: sortField,
-        order: sortOrder,
-        offset: showRecent ? 0 : (page - 1) * PAGE_SIZE,
-        limit: showRecent ? 5 : PAGE_SIZE,
-      }),
-    [sortField, sortOrder, page, showRecent],
-  );
-
-  // 总条数（用于计算分页）
-  const total = useLiveQuery(() => transactions.count(), []);
-
-  const totalPages = total ? Math.max(1, Math.ceil(total / PAGE_SIZE)) : 1;
+  const total = useLiveQuery(() => transactions.count());
+  const totalPages = Math.max(1, Math.ceil((total ?? 0) / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
+  const pageData = useLiveQuery(
+    () => transactions.list({
+      sortBy: showRecent ? "date" : sortField,
+      order: showRecent ? "desc" : sortOrder,
+      offset: showRecent ? 0 : (currentPage - 1) * PAGE_SIZE,
+      limit: showRecent ? 5 : PAGE_SIZE,
+    }),
+    [sortField, sortOrder, currentPage, showRecent],
+  );
 
   function handleSortFieldChange(value: string | null) {
     if (value) {
@@ -103,6 +70,7 @@ export default function Transactions() {
 
   function toggleSortOrder() {
     setSortOrder(prev => (prev === "asc" ? "desc" : "asc"));
+    setPage(1);
   }
 
   // 写入示例数据到 IndexedDB，方便演示
@@ -140,6 +108,7 @@ export default function Transactions() {
             <Select
               w={140}
               size="sm"
+              disabled={showRecent}
               value={sortField}
               onChange={handleSortFieldChange}
               data={[
@@ -151,6 +120,7 @@ export default function Transactions() {
               size="sm"
               variant="light"
               leftSection={<IconArrowsSort size={16} />}
+              disabled={showRecent}
               onClick={toggleSortOrder}
             >
               {sortOrder === "asc" ? "升序" : "降序"}
@@ -176,34 +146,36 @@ export default function Transactions() {
                   </Stack>
                 )
               : (
-                  <Table striped highlightOnHover withTableBorder>
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>日期</Table.Th>
-                        <Table.Th>类别</Table.Th>
-                        <Table.Th>备注</Table.Th>
-                        <Table.Th ta="right">金额</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {pageData.map(t => (
-                        <Table.Tr key={t.id}>
-                          <Table.Td>{t.date}</Table.Td>
-                          <Table.Td>
-                            <Badge color={categoryColor(t.category)} variant="light">
-                              {t.category}
-                            </Badge>
-                          </Table.Td>
-                          <Table.Td>{t.note || "—"}</Table.Td>
-                          <Table.Td ta="right">
-                            <Text fw={600} c={t.type === "income" ? "green" : "red"}>
-                              {formatAmount(t.type, t.amount)}
-                            </Text>
-                          </Table.Td>
+                  <Table.ScrollContainer minWidth={500}>
+                    <Table striped highlightOnHover>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>日期</Table.Th>
+                          <Table.Th>类别</Table.Th>
+                          <Table.Th>备注</Table.Th>
+                          <Table.Th ta="right">金额</Table.Th>
                         </Table.Tr>
-                      ))}
-                    </Table.Tbody>
-                  </Table>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {pageData.map(t => (
+                          <Table.Tr key={t.id}>
+                            <Table.Td>{t.date}</Table.Td>
+                            <Table.Td>
+                              <Badge color={t.type === "income" ? "green" : "gray"} variant="light">
+                                {t.category}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td>{t.note || "—"}</Table.Td>
+                            <Table.Td ta="right">
+                              <Text fw={600} c={t.type === "income" ? "green" : "red"}>
+                                {`${t.type === "income" ? "+" : "-"}${formatAmount(t.amount)}`}
+                              </Text>
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </Table.ScrollContainer>
                 )}
         </Card>
 
