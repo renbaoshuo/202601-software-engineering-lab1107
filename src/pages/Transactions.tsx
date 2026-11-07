@@ -6,12 +6,17 @@ import {
   Card,
   Container,
   Group,
+  Select,
   Stack,
   Table,
   Text,
   Title,
 } from "@mantine/core";
-import { IconList } from "@tabler/icons-react";
+import {
+  IconArrowsSort,
+  IconClock,
+  IconList,
+} from "@tabler/icons-react";
 import { transactions } from "../shared/db";
 import type { NewTransaction } from "../shared/types";
 
@@ -60,12 +65,35 @@ function categoryColor(category: string): string {
   return map[category] ?? "gray";
 }
 
+type SortField = "date" | "amount";
+type SortOrder = "asc" | "desc";
+
 export default function Transactions() {
-  // 列表数据：默认按日期降序返回全量
-  const pageData = useLiveQuery(() => transactions.list(), []);
+  const [sortField, setSortField] = useState<SortField>("date");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+
+  // 列表数据：按排序字段和方向查询
+  const pageData = useLiveQuery(
+    () =>
+      transactions.list({
+        sortBy: sortField,
+        order: sortOrder,
+      }),
+    [sortField, sortOrder],
+  );
 
   // 总条数
   const total = useLiveQuery(() => transactions.count(), []);
+
+  function handleSortFieldChange(value: string | null) {
+    if (value) {
+      setSortField(value as SortField);
+    }
+  }
+
+  function toggleSortOrder() {
+    setSortOrder(prev => (prev === "asc" ? "desc" : "asc"));
+  }
 
   // 写入示例数据到 IndexedDB，方便演示
   async function loadDemoData() {
@@ -76,6 +104,35 @@ export default function Transactions() {
     <Container size="lg">
       <Stack gap="md">
         <Title order={2}>账单流水</Title>
+
+        {/* 排序控制区 */}
+        <Card withBorder padding="sm">
+          <Group gap="md">
+            <Text size="sm" c="dimmed">
+              <IconClock size={16} style={{ verticalAlign: -3 }} />
+              {" "}
+              排序方式
+            </Text>
+            <Select
+              w={140}
+              size="sm"
+              value={sortField}
+              onChange={handleSortFieldChange}
+              data={[
+                { label: "按日期", value: "date" },
+                { label: "按金额", value: "amount" },
+              ]}
+            />
+            <Button
+              size="sm"
+              variant="light"
+              leftSection={<IconArrowsSort size={16} />}
+              onClick={toggleSortOrder}
+            >
+              {sortOrder === "asc" ? "升序" : "降序"}
+            </Button>
+          </Group>
+        </Card>
 
         {/* 账单列表 */}
         <Card withBorder padding={0}>
