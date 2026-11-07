@@ -6,7 +6,7 @@
 
 个人记账本（软件工程课程现场编程作业）：记录收支、查看账单、统计分析，数据保存在本地。
 
-技术栈：React 19 + TypeScript + Vite，UI 组件库 Mantine v9（`@mantine/core` + `@mantine/hooks`），图标 `@tabler/icons-react`，路由 `react-router` v8，包管理用 yarn。
+技术栈：React 19 + TypeScript + Vite，UI 组件库 Mantine v9（`@mantine/core` + `@mantine/hooks`），图标 `@tabler/icons-react`，路由 `react-router` v8，包管理用 yarn classic（1.x）。
 
 ## 常用命令
 
@@ -15,9 +15,12 @@ yarn install   # 安装依赖
 yarn dev       # 启动开发服务器
 yarn build     # 构建产物（tsc -b && vite build）
 yarn lint      # ESLint 检查
+yarn typecheck # TypeScript 类型检查（tsc -b，tsconfig 已设 noEmit，不产出文件）
 ```
 
-改完代码跑 `yarn lint` 确认无报错即可，不需要跑构建验证。
+改完代码跑 `yarn lint` 和 `yarn typecheck` 确认无报错即可，不需要跑构建验证。
+
+包管理器统一用 yarn classic，版本已由 `package.json` 的 `packageManager` 字段锁定。安装、增删依赖、跑脚本一律用 `yarn`，不要用 npm、pnpm 等其他包管理器，避免生成并存的 lockfile。
 
 ## 提交规范
 
@@ -40,8 +43,17 @@ commit message 格式为 `feat/fix/chore: {message}`：
 - `src/pages/` — 页面组件，每个文件默认导出一个函数组件，一个路由一个文件
 - `src/components/` — 可复用的 UI 组件（如 `AppLayout` 布局、`PagePlaceholder`，以及基于 Mantine 二次封装的业务组件）
 - `src/hooks/` — 自定义 hooks（写之前先确认 `@mantine/hooks` 里没有现成的）
-- `src/utils/` — 工具函数（写之前先确认三方库覆盖不到）
-- `src/shared/` — 只放数据存储相关：`db.ts` 存储接口、`types.ts` 共享数据类型，其他东西不放这里
+- `src/utils/` — 工具函数（写之前先确认三方库覆盖不到；金额与日期的解析格式化统一走 `format.ts`，不要在页面里另写一份）
+- `src/shared/` — 只放跨页面共享的数据约定：`db.ts` 存储接口、`types.ts` 共享数据类型、`constants.ts` 默认分类，其他东西不放这里
+
+## 骨架文件冻结
+
+以下骨架文件已冻结，开发页面功能时不要改动：
+
+- `src/main.tsx`、`src/App.tsx`、`src/components/AppLayout.tsx` —— 入口、路由表、布局导航已全部挂好，页面开发不需要碰
+- `src/shared/db.ts`、`src/shared/types.ts` —— 数据层契约，全站页面共用
+
+页面开发只新增/修改 `src/pages/` 下自己的页面文件，以及在 `src/components/`、`src/hooks/`、`src/utils/` 里新增文件。确需改骨架（如数据层接口要调整）时，先提出达成一致再单独提交，不要顺手改。
 
 ## 数据存储约定
 
@@ -50,6 +62,14 @@ commit message 格式为 `feat/fix/chore: {message}`：
 - 账单流水、日历、总览和统计共用 `transactions.list(query)`。默认按账单日期降序，日期和金额范围包含端点，关键词匹配分类或备注且忽略大小写。分页用 `offset`、`limit` 和 `transactions.count(filter)`。React 页面用 `dexie-react-hooks` 的 `useLiveQuery` 订阅查询，首次加载时处理 `undefined`。
 - `budgets` 按月份保存预算额，使用额按该月支出账单计算。`savingsGoals.deposit(id, amount)` 累加目标的已存金额，与账单独立。`get` 找不到记录时返回 `undefined`，`update` 和 `deposit` 找不到记录时返回 `false`。
 - 数据管理页负责 JSON/CSV 文件的解析和校验。`ledgerBackup.read()` 返回完整快照，`ledgerBackup.restore(backup)` 在一个事务中覆盖现有数据。CSV 账单解析成 `NewTransaction[]` 后用 `transactions.addMany` 追加。
+
+## 跨页面统一约定
+
+这些东西全站必须长一个样，唯一出处固定，页面里不要自己造：
+
+- 分类列表：默认分类在 `src/shared/constants.ts`，分类选择器、筛选下拉、统计分组都从这里取分类文案；页面可自定义展示样式，但分类名称与收支归属以它为准。要调整分类就改这个文件，不要在页面里写死分类。
+- 金额展示：统一用 `src/utils/format.ts` 的 `formatAmount`（内部 currency.js），千分位与两位小数全站一致，不要在页面里手写除以 100 或 `toFixed`。
+- 日期处理：统一用 date-fns，不要再引入 dayjs、moment 等其他日期库；`YYYY-MM-DD` 字符串转 Date 必须走 `utils/format.ts` 的 `parseDate`（`new Date(iso)` 按 UTC 解析，时区偏移为负时会偏移一天）。
 
 ## 编码原则
 
@@ -73,6 +93,7 @@ commit message 格式为 `feat/fix/chore: {message}`：
 - UI 是状态的映射：用 state/props 驱动视图，条件渲染、列表渲染都用 JSX 表达式完成。
 - 禁止用 `document.querySelector`、直接改 `classList`/`style` 这类命令式 DOM 操作来绕过框架。确需访问 DOM 时（聚焦、滚动）用 `ref`，且优先用 Mantine 组件自带的 ref/相关 props。
 - 组件拆分以页面为单位，页面内过大的 JSX 块再拆子组件；状态尽量放在离使用处最近的组件，不提前引入 Context/Redux 之类的全局状态方案。
+- 公共组件（如账单表单）允许先内联在页面里实现，合并阶段再统一抽到 `src/components/`；多个页面各自内联了同一组件时，以最先合入的版本为准抽公共，其余改为引用，不要并行维护多份实现。
 
 ### 5. 不写测试，不过度防御
 
