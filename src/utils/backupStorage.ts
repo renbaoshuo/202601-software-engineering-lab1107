@@ -78,6 +78,7 @@ export function createBackup(snapshot: LedgerBackup, kind: BackupKind): BackupMe
 
   const tempItemKey = `${ITEM_PREFIX}pending:${id}`;
   const finalItemKey = `${ITEM_PREFIX}${id}`;
+  let indexCommitted = false;
   try {
     // 先写临时项、校验后再替换正式项，避免留下半截备份。
     localStorage.setItem(tempItemKey, JSON.stringify({ ...record, size: record.size }));
@@ -106,11 +107,13 @@ export function createBackup(snapshot: LedgerBackup, kind: BackupKind): BackupMe
     }
 
     localStorage.setItem(INDEX_KEY, JSON.stringify(nextIndex));
+    indexCommitted = true;
     localStorage.removeItem(tempItemKey);
     localStorage.removeItem(INDEX_TEMP_KEY);
     return nextIndex[0];
   }
   catch (error) {
+    if (!indexCommitted) localStorage.removeItem(finalItemKey);
     localStorage.removeItem(tempItemKey);
     localStorage.removeItem(INDEX_TEMP_KEY);
     const message = error instanceof Error ? error.message : "未知错误";
