@@ -18,31 +18,69 @@ import { transactions } from "../shared/db";
 import type { TransactionType } from "../shared/types";
 import { formatDate, toCents } from "../utils/format";
 
+interface FormErrors {
+  amount?: string;
+  category?: string;
+  date?: string;
+}
+
 export default function TransactionForm() {
   const [type, setType] = useState<TransactionType>("expense");
   const [amount, setAmount] = useState<number | string>("");
   const [category, setCategory] = useState<string | null>(null);
   const [date, setDate] = useState<string | null>(formatDate(new Date()));
   const [note, setNote] = useState("");
+  const [errors, setErrors] = useState<FormErrors>({});
 
   function changeType(value: string) {
     setType(value as TransactionType);
     // 分类按收支类型分组，切换后原分类可能不在新列表里。
     setCategory(null);
+    setErrors(prev => ({ ...prev, category: undefined }));
+  }
+
+  function validate(): boolean {
+    const next: FormErrors = {};
+    const value = Number(amount);
+
+    if (amount === "") {
+      next.amount = "请输入金额";
+    }
+    else if (!Number.isFinite(value)) {
+      next.amount = "请输入有效金额";
+    }
+    else if (value < 0) {
+      next.amount = "金额不能为负数";
+    }
+    else if (value === 0) {
+      next.amount = "金额必须大于 0";
+    }
+    else if (!/^\d+(\.\d{1,2})?$/.test(String(amount))) {
+      next.amount = "金额最多保留两位小数";
+    }
+
+    if (!category) next.category = "请选择类别";
+    if (!date) next.date = "请选择日期";
+
+    setErrors(next);
+    return Object.keys(next).length === 0;
   }
 
   async function handleSave() {
+    if (!validate()) return;
+
     await transactions.add({
       type,
-      amount: toCents(Number(amount) || 0),
-      category: category ?? "",
-      date: date ?? formatDate(new Date()),
+      amount: toCents(Number(amount)),
+      category: category!,
+      date: date!,
       note: note.trim(),
     });
 
     setAmount("");
     setNote("");
     setCategory(null);
+    setErrors({});
   }
 
   return (
@@ -68,6 +106,7 @@ export default function TransactionForm() {
             value={date}
             onChange={setDate}
             allowDeselect={false}
+            error={errors.date}
           />
           <NumberInput
             label="金额（元）"
@@ -76,7 +115,11 @@ export default function TransactionForm() {
             decimalScale={2}
             leftSection="¥"
             value={amount}
-            onChange={setAmount}
+            onChange={(value) => {
+              setAmount(value);
+              setErrors(prev => ({ ...prev, amount: undefined }));
+            }}
+            error={errors.amount}
           />
         </SimpleGrid>
 
@@ -86,8 +129,12 @@ export default function TransactionForm() {
             placeholder="选择类别"
             data={DEFAULT_CATEGORIES[type]}
             value={category}
-            onChange={setCategory}
+            onChange={(value) => {
+              setCategory(value);
+              setErrors(prev => ({ ...prev, category: undefined }));
+            }}
             allowDeselect={false}
+            error={errors.category}
           />
           <TextInput
             label="备注"
