@@ -33,9 +33,10 @@ function toCents(yuan: number) {
 }
 
 // 目标金额在数据层可能为 0（如恢复外部备份），兜底避免算出 NaN 破坏进度条。
+// 向下取整：四舍五入会让 99.5% 提前显示 100%，误判为已完成。
 function getPercent(goal: SavingsGoal) {
   return goal.targetAmount > 0
-    ? Math.round((goal.savedAmount / goal.targetAmount) * 100)
+    ? Math.floor((goal.savedAmount / goal.targetAmount) * 100)
     : 0;
 }
 
