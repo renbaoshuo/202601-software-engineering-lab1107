@@ -1,23 +1,32 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Affix,
   Button,
   Card,
   Group,
+  Notification,
   NumberInput,
   SegmentedControl,
   Select,
   SimpleGrid,
   Stack,
+  Text,
   TextInput,
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import "@mantine/dates/styles.css";
-import { IconArrowLeft, IconCalendar, IconDeviceFloppy } from "@tabler/icons-react";
+import {
+  IconArrowLeft,
+  IconCalendar,
+  IconCheck,
+  IconDeviceFloppy,
+} from "@tabler/icons-react";
 import { useLocation, useNavigate } from "react-router";
 import { DEFAULT_CATEGORIES } from "../shared/constants";
 import { transactions } from "../shared/db";
 import type { TransactionType } from "../shared/types";
-import { formatDate, toCents } from "../utils/format";
+import { notifyTransactionAdded } from "../utils/events";
+import { formatAmount, formatDate, toCents } from "../utils/format";
 
 interface FormErrors {
   amount?: string;
@@ -35,6 +44,15 @@ export default function TransactionForm() {
   const [date, setDate] = useState<string | null>(formatDate(new Date()));
   const [note, setNote] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [success, setSuccess] = useState<{ text: string; at: number } | null>(null);
+
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => setSuccess(null), 3500);
+    return () => clearTimeout(timer);
+  }, [success]);
 
   function changeType(value: string) {
     setType(value as TransactionType);
@@ -83,24 +101,41 @@ export default function TransactionForm() {
   async function handleSave(continueAdding: boolean) {
     if (!validate()) return;
 
-    await transactions.add({
+    const input = {
       type,
       amount: toCents(Number(amount)),
       category: category!,
       date: date!,
       note: note.trim(),
-    });
+    };
 
-    if (continueAdding) {
-      // 连续记账保留日期与收支类型，只清空本笔业务字段并聚焦金额。
-      setAmount("");
-      setNote("");
-      setCategory(null);
-      setErrors({});
-      amountRef.current?.focus();
+    setSaving(true);
+    setSaveError("");
+    try {
+      await transactions.add(input);
+      notifyTransactionAdded(input);
+
+      if (continueAdding) {
+        setSuccess({
+          text: `已记下这笔${type === "expense" ? "支出" : "收入"} ${formatAmount(input.amount)}`,
+          at: Date.now(),
+        });
+        // 连续记账保留日期与收支类型，只清空本笔业务字段并聚焦金额。
+        setAmount("");
+        setNote("");
+        setCategory(null);
+        setErrors({});
+        amountRef.current?.focus();
+      }
+      else {
+        goBack();
+      }
     }
-    else {
-      goBack();
+    catch {
+      setSaveError("保存失败，请稍后重试");
+    }
+    finally {
+      setSaving(false);
     }
   }
 
@@ -167,22 +202,41 @@ export default function TransactionForm() {
           />
         </SimpleGrid>
 
+        {saveError && (
+          <Text size="sm" c="red">{saveError}</Text>
+        )}
+
         <Group justify="flex-end" gap="sm">
           <Button
             variant="default"
             leftSection={<IconArrowLeft size={16} />}
             onClick={() => handleSave(false)}
+            disabled={saving}
           >
             保存并返回
           </Button>
           <Button
             leftSection={<IconDeviceFloppy size={16} />}
             onClick={() => handleSave(true)}
+            loading={saving}
           >
             保存并再记一笔
           </Button>
         </Group>
       </Stack>
+
+      {success && (
+        <Affix position={{ top: 16, right: 16 }} zIndex={400}>
+          <Notification
+            color="green"
+            icon={<IconCheck size={18} />}
+            title="保存成功"
+            onClose={() => setSuccess(null)}
+          >
+            {success.text}
+          </Notification>
+        </Affix>
+      )}
     </Card>
   );
 }
