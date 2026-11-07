@@ -20,7 +20,7 @@ import {
 } from "@tabler/icons-react";
 import { DEFAULT_CATEGORIES } from "../shared/constants";
 import { transactions } from "../shared/db";
-import type { NewTransaction, TransactionType } from "../shared/types";
+import type { NewTransaction, Transaction, TransactionType } from "../shared/types";
 import { formatAmount, formatDate, fromCents, toCents } from "../utils/format";
 import { parseTransactionText } from "../utils/smartParse";
 
@@ -31,6 +31,8 @@ interface FormErrors {
 }
 
 interface TransactionFormProps {
+  transaction?: Transaction;
+  onCancel: () => void;
   onSaved: (transaction: NewTransaction, continueAdding: boolean) => void;
 }
 
@@ -51,13 +53,13 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
   { label: "工资", type: "income", category: "工资", amount: 800000, note: "工资" },
 ];
 
-export default function TransactionForm({ onSaved }: TransactionFormProps) {
+export default function TransactionForm({ transaction, onCancel, onSaved }: TransactionFormProps) {
   const amountRef = useRef<HTMLInputElement>(null);
-  const [type, setType] = useState<TransactionType>("expense");
-  const [amount, setAmount] = useState<number | string>("");
-  const [category, setCategory] = useState<string | null>(null);
-  const [date, setDate] = useState(() => formatDate(new Date()));
-  const [note, setNote] = useState("");
+  const [type, setType] = useState<TransactionType>(transaction?.type ?? "expense");
+  const [amount, setAmount] = useState<number | string>(transaction ? fromCents(transaction.amount) : "");
+  const [category, setCategory] = useState<string | null>(transaction?.category ?? null);
+  const [date, setDate] = useState(() => transaction?.date ?? formatDate(new Date()));
+  const [note, setNote] = useState(transaction?.note ?? "");
   const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -65,10 +67,17 @@ export default function TransactionForm({ onSaved }: TransactionFormProps) {
   const [parseError, setParseError] = useState("");
   const [parseTip, setParseTip] = useState("");
 
+  const categories = DEFAULT_CATEGORIES[type];
+  // 导入的账单可能使用自定义类别，编辑时仍可保留该类别。
+  const categoryOptions = transaction?.type === type && !categories.includes(transaction.category)
+    ? [transaction.category, ...categories]
+    : categories;
+
   function changeType(value: string) {
-    setType(value as TransactionType);
-    // 分类按收支类型分组，切换后原分类可能不在新列表里。
-    setCategory(null);
+    const nextType = value as TransactionType;
+    setType(nextType);
+    // 只有新类型也支持的类别才可以沿用。
+    if (!category || !DEFAULT_CATEGORIES[nextType].includes(category)) setCategory(null);
     setErrors(prev => ({ ...prev, category: undefined }));
   }
 
@@ -137,13 +146,22 @@ export default function TransactionForm({ onSaved }: TransactionFormProps) {
       amount: toCents(Number(amount)),
       category,
       date,
-      note: note.trim(),
+      note: transaction ? note : note.trim(),
     };
 
     setSaving(true);
     setSaveError("");
     try {
-      await transactions.add(input);
+      if (transaction) {
+        const updated = await transactions.update(transaction.id, input);
+        if (!updated) {
+          setSaveError("这笔账单已不存在");
+          return;
+        }
+      }
+      else {
+        await transactions.add(input);
+      }
 
       if (continueAdding) {
         // 连续记账保留日期与收支类型，只清空本笔业务字段并聚焦金额。
@@ -167,56 +185,62 @@ export default function TransactionForm({ onSaved }: TransactionFormProps) {
 
   return (
     <Stack gap="md">
-      <Card withBorder radius="md" padding="md">
-        <Group gap="xs" mb="sm">
-          <IconBolt size={18} stroke={1.6} />
-          <Text fw={600}>快捷模板</Text>
-          <Text size="xs" c="dimmed">常用记录点一下就能填好</Text>
-        </Group>
-        <Group gap="xs">
-          {QUICK_TEMPLATES.map(template => (
-            <Button
-              key={template.label}
-              size="compact-md"
-              variant="light"
-              color={template.type === "income" ? "green" : "orange"}
-              onClick={() => applyTemplate(template)}
-            >
-              {template.label}
-              {" "}
-              {formatAmount(template.amount)}
-            </Button>
-          ))}
-        </Group>
-      </Card>
+      {!transaction && (
+        <Card withBorder radius="md" padding="md">
+          <Group gap="xs" mb="sm">
+            <IconBolt size={18} stroke={1.6} />
+            <Text fw={600}>快捷模板</Text>
+            <Text size="xs" c="dimmed">常用记录点一下就能填好</Text>
+          </Group>
+          <Group gap="xs">
+            {QUICK_TEMPLATES.map(template => (
+              <Button
+                key={template.label}
+                size="compact-md"
+                variant="light"
+                color={template.type === "income" ? "green" : "orange"}
+                onClick={() => applyTemplate(template)}
+              >
+                {template.label}
+                {" "}
+                {formatAmount(template.amount)}
+              </Button>
+            ))}
+          </Group>
+        </Card>
+      )}
 
       <Card withBorder radius="md" padding="lg" shadow="sm">
         <Stack gap="md">
-          <TextInput
-            label="智能识别"
-            placeholder="一句话记账，例如：昨天打车花了 25"
-            value={parseText}
-            leftSection={<IconWand size={16} />}
-            rightSectionWidth={76}
-            rightSection={(
-              <Button size="compact-sm" variant="light" onClick={handleParse}>
-                识别
-              </Button>
-            )}
-            onChange={(event) => {
-              setParseText(event.currentTarget.value);
-              setParseError("");
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                handleParse();
-              }
-            }}
-            error={parseError}
-          />
-          {parseTip && (
-            <Text size="xs" c="green">{parseTip}</Text>
+          {!transaction && (
+            <>
+              <TextInput
+                label="智能识别"
+                placeholder="一句话记账，例如：昨天打车花了 25"
+                value={parseText}
+                leftSection={<IconWand size={16} />}
+                rightSectionWidth={76}
+                rightSection={(
+                  <Button size="compact-sm" variant="light" onClick={handleParse}>
+                    识别
+                  </Button>
+                )}
+                onChange={(event) => {
+                  setParseText(event.currentTarget.value);
+                  setParseError("");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleParse();
+                  }
+                }}
+                error={parseError}
+              />
+              {parseTip && (
+                <Text size="xs" c="green">{parseTip}</Text>
+              )}
+            </>
           )}
 
           <SegmentedControl
@@ -259,7 +283,7 @@ export default function TransactionForm({ onSaved }: TransactionFormProps) {
             <Select
               label="类别"
               placeholder="选择类别"
-              data={DEFAULT_CATEGORIES[type]}
+              data={categoryOptions}
               value={category}
               onChange={(value) => {
                 setCategory(value);
@@ -272,7 +296,7 @@ export default function TransactionForm({ onSaved }: TransactionFormProps) {
               label="备注"
               placeholder="选填，例如：和同事聚餐"
               value={note}
-              maxLength={100}
+              maxLength={transaction ? undefined : 100}
               onChange={event => setNote(event.currentTarget.value)}
             />
           </SimpleGrid>
@@ -281,23 +305,32 @@ export default function TransactionForm({ onSaved }: TransactionFormProps) {
             <Text size="sm" c="red">{saveError}</Text>
           )}
 
-          <Group justify="flex-end" gap="sm">
-            <Button
-              variant="default"
-              leftSection={<IconArrowLeft size={16} />}
-              onClick={() => handleSave(false)}
-              disabled={saving}
-            >
-              保存并返回
-            </Button>
-            <Button
-              leftSection={<IconDeviceFloppy size={16} />}
-              onClick={() => handleSave(true)}
-              loading={saving}
-            >
-              保存并再记一笔
-            </Button>
-          </Group>
+          {transaction
+            ? (
+                <Group justify="flex-end" gap="sm">
+                  <Button variant="default" onClick={onCancel} disabled={saving}>取消</Button>
+                  <Button onClick={() => handleSave(false)} loading={saving}>保存</Button>
+                </Group>
+              )
+            : (
+                <Group justify="flex-end" gap="sm">
+                  <Button
+                    variant="default"
+                    leftSection={<IconArrowLeft size={16} />}
+                    onClick={() => handleSave(false)}
+                    disabled={saving}
+                  >
+                    保存并返回
+                  </Button>
+                  <Button
+                    leftSection={<IconDeviceFloppy size={16} />}
+                    onClick={() => handleSave(true)}
+                    loading={saving}
+                  >
+                    保存并再记一笔
+                  </Button>
+                </Group>
+              )}
         </Stack>
       </Card>
     </Stack>

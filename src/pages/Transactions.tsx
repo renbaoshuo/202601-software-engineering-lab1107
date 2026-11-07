@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   Affix,
   Alert,
-  Badge,
   Button,
   Card,
   Container,
@@ -13,7 +12,6 @@ import {
   SegmentedControl,
   Select,
   Stack,
-  Table,
   Text,
   Title,
 } from "@mantine/core";
@@ -23,12 +21,12 @@ import {
   IconClock,
   IconPlus,
 } from "@tabler/icons-react";
-import { useDisclosure } from "@mantine/hooks";
 import TransactionForm from "../components/TransactionForm";
 import TransactionQuery from "../components/TransactionQuery";
+import TransactionTable from "../components/TransactionTable";
 import useTransactionQuery from "../hooks/useTransactionQuery";
 import { transactions } from "../shared/db";
-import type { NewTransaction, TransactionFilter, TransactionQuery as Query } from "../shared/types";
+import type { NewTransaction, Transaction, TransactionFilter, TransactionQuery as Query } from "../shared/types";
 import { formatAmount } from "../utils/format";
 
 const PAGE_SIZE = 8;
@@ -57,7 +55,7 @@ export default function Transactions() {
   const [page, setPage] = useState(1);
   const [showRecent, setShowRecent] = useState(false);
 
-  const [addOpened, { open: openAdd, close: closeAdd }] = useDisclosure();
+  const [form, setForm] = useState<{ transaction?: Transaction } | null>(null);
   const [notice, setNotice] = useState<{ message: string } | null>(null);
   const result = useTransactionQuery(filter, {
     page: showRecent ? 1 : page,
@@ -66,15 +64,21 @@ export default function Transactions() {
     order: showRecent ? "desc" : sortOrder,
   });
 
+  // 列表内容变化后重新选择，避免批量删除包含不可见的账单。
+  const visibleRowsKey = result?.records.map(record => record.id).join(",");
+
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(null), 3500);
     return () => clearTimeout(timer);
   }, [notice]);
 
-  function handleAdded(transaction: NewTransaction, continueAdding: boolean) {
-    setNotice({ message: `已记录${transaction.type === "income" ? "收入" : "支出"} ${formatAmount(transaction.amount)}` });
-    if (!continueAdding) closeAdd();
+  function handleSaved(transaction: NewTransaction, continueAdding: boolean) {
+    const message = form?.transaction
+      ? "账单已保存"
+      : `已记录${transaction.type === "income" ? "收入" : "支出"} ${formatAmount(transaction.amount)}`;
+    setNotice({ message });
+    if (!continueAdding) setForm(null);
   }
 
   function handleSortFieldChange(value: string | null) {
@@ -100,7 +104,7 @@ export default function Transactions() {
       <Stack gap="md">
         <Group justify="space-between">
           <Title order={2}>账单</Title>
-          <Button leftSection={<IconPlus size={16} />} onClick={openAdd}>记一笔</Button>
+          <Button leftSection={<IconPlus size={16} />} onClick={() => setForm({})}>记一笔</Button>
         </Group>
 
         <TransactionQuery
@@ -168,38 +172,12 @@ export default function Transactions() {
                         </Stack>
                       )
                     : (
-                        <Table.ScrollContainer minWidth={560}>
-                          <Table striped highlightOnHover>
-                            <Table.Thead>
-                              <Table.Tr>
-                                <Table.Th>日期</Table.Th>
-                                <Table.Th>收支类型</Table.Th>
-                                <Table.Th>类别</Table.Th>
-                                <Table.Th>备注</Table.Th>
-                                <Table.Th ta="right">金额</Table.Th>
-                              </Table.Tr>
-                            </Table.Thead>
-                            <Table.Tbody>
-                              {result.records.map(record => (
-                                <Table.Tr key={record.id}>
-                                  <Table.Td>{record.date}</Table.Td>
-                                  <Table.Td>
-                                    <Badge color={record.type === "income" ? "green" : "red"} variant="light">
-                                      {record.type === "income" ? "收入" : "支出"}
-                                    </Badge>
-                                  </Table.Td>
-                                  <Table.Td>{record.category}</Table.Td>
-                                  <Table.Td>{record.note || "—"}</Table.Td>
-                                  <Table.Td ta="right">
-                                    <Text fw={600} c={record.type === "income" ? "green" : "red"}>
-                                      {`${record.type === "income" ? "+" : "-"}${formatAmount(record.amount)}`}
-                                    </Text>
-                                  </Table.Td>
-                                </Table.Tr>
-                              ))}
-                            </Table.Tbody>
-                          </Table>
-                        </Table.ScrollContainer>
+                        <TransactionTable
+                          key={visibleRowsKey}
+                          records={result.records}
+                          onEdit={transaction => setForm({ transaction })}
+                          onDeleted={count => setNotice({ message: `已删除 ${count} 笔账单` })}
+                        />
                       )}
               </Card>
             )}
@@ -216,8 +194,20 @@ export default function Transactions() {
         )}
       </Stack>
 
-      <Modal opened={addOpened} onClose={closeAdd} title="记一笔" size="lg" centered>
-        <TransactionForm onSaved={handleAdded} />
+      <Modal
+        opened={form !== null}
+        onClose={() => setForm(null)}
+        title={form?.transaction ? "编辑账单" : "记一笔"}
+        size="lg"
+        centered
+      >
+        {form && (
+          <TransactionForm
+            transaction={form.transaction}
+            onCancel={() => setForm(null)}
+            onSaved={handleSaved}
+          />
+        )}
       </Modal>
 
       {notice && (
@@ -225,7 +215,7 @@ export default function Transactions() {
           <Notification
             color="green"
             icon={<IconCheck size={18} />}
-            title="保存成功"
+            title="操作成功"
             closeButtonProps={{ "aria-label": "关闭提示" }}
             onClose={() => setNotice(null)}
           >
