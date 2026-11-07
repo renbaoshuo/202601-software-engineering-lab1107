@@ -4,7 +4,6 @@ import {
   Alert,
   Button,
   Card,
-  Container,
   Group,
   Modal,
   Notification,
@@ -15,6 +14,7 @@ import {
   Text,
   Title,
 } from "@mantine/core";
+import PageContainer from "../components/PageContainer";
 import {
   IconArrowsSort,
   IconCheck,
@@ -100,7 +100,7 @@ export default function Transactions() {
   }
 
   return (
-    <Container size="lg">
+    <PageContainer>
       <Stack gap="md">
         <Group justify="space-between">
           <Title order={2}>账单</Title>
@@ -223,6 +223,6 @@ export default function Transactions() {
           </Notification>
         </Affix>
       )}
-    </Container>
+    </PageContainer>
   );
 }

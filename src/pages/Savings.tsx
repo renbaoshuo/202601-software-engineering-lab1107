@@ -3,7 +3,6 @@ import {
   Button,
   Card,
   Center,
-  Container,
   Group,
   Loader,
   Modal,
@@ -15,6 +14,7 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
+import PageContainer from "../components/PageContainer";
 import { IconPigMoney, IconPlus } from "@tabler/icons-react";
 import currency from "currency.js";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -145,7 +145,7 @@ export default function Savings() {
   }
 
   return (
-    <Container size="lg">
+    <PageContainer>
       <Group justify="space-between" mb="lg">
         <Title order={2}>储蓄目标</Title>
         <Button leftSection={<IconPlus size={16} />} onClick={() => setCreateOpen(true)}>
@@ -196,6 +196,6 @@ export default function Savings() {
           <Button disabled={!canDeposit || depositing} loading={depositing} onClick={handleDeposit}>确认存入</Button>
         </Stack>
       </Modal>
-    </Container>
+    </PageContainer>
   );
 }

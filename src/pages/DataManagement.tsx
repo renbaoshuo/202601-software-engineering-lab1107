@@ -2,7 +2,6 @@ import {
   Alert,
   Badge,
   Button,
-  Container,
   Grid,
   Group,
   Modal,
@@ -18,6 +17,7 @@ import {
   ThemeIcon,
   Title,
 } from "@mantine/core";
+import PageContainer from "../components/PageContainer";
 import {
   IconAlertTriangle,
   IconArchive,
@@ -460,7 +460,7 @@ export default function DataManagement() {
   }
 
   return (
-    <Container px={0} size="xl">
+    <PageContainer>
       <Stack gap="lg">
         <Group align="flex-start" gap="md" justify="space-between" wrap="wrap">
           <Stack gap={4}>
@@ -914,6 +914,6 @@ export default function DataManagement() {
           </Stack>
         )}
       </Modal>
-    </Container>
+    </PageContainer>
   );
 }

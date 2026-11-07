@@ -1,4 +1,5 @@
-import { Loader, Progress } from "@mantine/core";
+import { Loader, Progress, Table } from "@mantine/core";
+import PageContainer from "../components/PageContainer";
 import { useTimeout } from "@mantine/hooks";
 import currency from "currency.js";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -69,7 +70,11 @@ export default function Budget() {
   });
 
   if (rows === undefined || spendMap === undefined) {
-    return <Loader role="status" aria-label="正在加载预算" />;
+    return (
+      <PageContainer>
+        <Loader role="status" aria-label="正在加载预算" />
+      </PageContainer>
+    );
   }
 
   const editing = rows.find(row => row.month === month);
@@ -113,7 +118,7 @@ export default function Budget() {
   }
 
   return (
-    <div className="budget-page">
+    <PageContainer className="budget-page">
       <section className="budget-card">
         <h2 className="budget-card__title">{`${month} 概览`}</h2>
         {editing === undefined
@@ -187,52 +192,54 @@ export default function Budget() {
               <p className="budget-empty">还没有任何预算记录。</p>
             )
           : (
-              <table className="budget-table">
-                <thead>
-                  <tr>
-                    <th>月份</th>
-                    <th>预算</th>
-                    <th>已花</th>
-                    <th>进度</th>
-                    <th>剩余</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => {
-                    const rowSpent = spendMap[row.month] ?? 0;
-                    const rowLeft = row.amount - rowSpent;
-                    return (
-                      <tr key={row.month}>
-                        <td>{row.month}</td>
-                        <td>{formatAmount(row.amount)}</td>
-                        <td>{formatAmount(rowSpent)}</td>
-                        <td>
-                          <BudgetProgress month={row.month} spent={rowSpent} amount={row.amount} compact />
-                        </td>
-                        <td className={rowLeft < 0 ? "budget-negative" : undefined}>
-                          <strong>{formatAmount(rowLeft)}</strong>
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className={
-                              confirmId === row.month
-                                ? "budget-button budget-button--danger"
-                                : "budget-button budget-button--ghost"
-                            }
-                            onClick={() => removeOne(row.month)}
-                          >
-                            {confirmId === row.month ? "确认删除？" : "删除"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <Table.ScrollContainer minWidth={600}>
+                <table className="budget-table">
+                  <thead>
+                    <tr>
+                      <th>月份</th>
+                      <th>预算</th>
+                      <th>已花</th>
+                      <th>进度</th>
+                      <th>剩余</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => {
+                      const rowSpent = spendMap[row.month] ?? 0;
+                      const rowLeft = row.amount - rowSpent;
+                      return (
+                        <tr key={row.month}>
+                          <td>{row.month}</td>
+                          <td>{formatAmount(row.amount)}</td>
+                          <td>{formatAmount(rowSpent)}</td>
+                          <td>
+                            <BudgetProgress month={row.month} spent={rowSpent} amount={row.amount} compact />
+                          </td>
+                          <td className={rowLeft < 0 ? "budget-negative" : undefined}>
+                            <strong>{formatAmount(rowLeft)}</strong>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className={
+                                confirmId === row.month
+                                  ? "budget-button budget-button--danger"
+                                  : "budget-button budget-button--ghost"
+                              }
+                              onClick={() => removeOne(row.month)}
+                            >
+                              {confirmId === row.month ? "确认删除？" : "删除"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </Table.ScrollContainer>
             )}
       </section>
-    </div>
+    </PageContainer>
   );
 }

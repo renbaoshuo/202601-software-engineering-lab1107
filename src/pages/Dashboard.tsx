@@ -8,6 +8,7 @@ import {
   ThemeIcon,
   Title,
 } from "@mantine/core";
+import PageContainer from "../components/PageContainer";
 import {
   IconArrowDownLeft,
   IconArrowUpRight,
@@ -70,32 +71,34 @@ export default function Dashboard() {
     : summary.totalIncome - summary.totalExpense;
 
   return (
-    <Stack gap="xl">
-      <Stack gap={4}>
-        <Title order={2}>收支总览</Title>
-        <Text c="dimmed">查看全部账单的收入、支出和当前结余</Text>
-      </Stack>
+    <PageContainer>
+      <Stack gap="xl">
+        <Stack gap={4}>
+          <Title order={2}>收支总览</Title>
+          <Text c="dimmed">查看全部账单的收入、支出和当前结余</Text>
+        </Stack>
 
-      <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="lg">
-        <SummaryCard
-          amount={totalIncome}
-          color="green"
-          icon={<IconArrowDownLeft size={22} stroke={1.8} />}
-          title="总收入"
-        />
-        <SummaryCard
-          amount={totalExpense}
-          color="red"
-          icon={<IconArrowUpRight size={22} stroke={1.8} />}
-          title="总支出"
-        />
-        <SummaryCard
-          amount={balance}
-          color="indigo"
-          icon={<IconWallet size={22} stroke={1.8} />}
-          title="当前结余"
-        />
-      </SimpleGrid>
-    </Stack>
+        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="lg">
+          <SummaryCard
+            amount={totalIncome}
+            color="green"
+            icon={<IconArrowDownLeft size={22} stroke={1.8} />}
+            title="总收入"
+          />
+          <SummaryCard
+            amount={totalExpense}
+            color="red"
+            icon={<IconArrowUpRight size={22} stroke={1.8} />}
+            title="总支出"
+          />
+          <SummaryCard
+            amount={balance}
+            color="indigo"
+            icon={<IconWallet size={22} stroke={1.8} />}
+            title="当前结余"
+          />
+        </SimpleGrid>
+      </Stack>
+    </PageContainer>
   );
 }
