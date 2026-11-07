@@ -72,45 +72,51 @@ export default function TrendChart() {
   const bills = useLiveQuery(() => transactions.list({ sortBy: "date", order: "asc" }), []);
   const buckets = useMemo(() => summarize(bills ?? [], dimension), [bills, dimension]);
 
-  const option = useMemo<EChartsOption>(() => ({
-    tooltip: {
-      trigger: "axis",
-      // 数据以整数分参与计算，展示时统一交给 formatAmount，避免各页口径不一致。
-      valueFormatter: value => formatAmount(Number(value)),
-    },
-    legend: { data: ["收入", "支出"], bottom: 0 },
-    grid: { left: 72, right: 24, top: 32, bottom: 48 },
-    xAxis: {
-      type: "category",
-      data: buckets.map(bucket => bucket.label),
-      axisTick: { show: false },
-    },
-    yAxis: {
-      type: "value",
-      axisLabel: { formatter: value => formatAmount(value) },
-      splitLine: { lineStyle: { type: "dashed" } },
-    },
-    series: [
-      {
-        name: "收入",
-        type: "line",
-        smooth: true,
-        symbolSize: 6,
-        data: buckets.map(bucket => bucket.income),
-        itemStyle: { color: "#12b886" },
-        areaStyle: { opacity: 0.08 },
+  const option = useMemo<EChartsOption>(() => {
+    const peak = Math.max(0, ...buckets.map(bucket => Math.max(bucket.income, bucket.expense)));
+    return {
+      tooltip: {
+        trigger: "axis",
+        // 数据以整数分参与计算，展示时统一交给 formatAmount，避免各页口径不一致。
+        valueFormatter: value => formatAmount(Number(value)),
       },
-      {
-        name: "支出",
-        type: "line",
-        smooth: true,
-        symbolSize: 6,
-        data: buckets.map(bucket => bucket.expense),
-        itemStyle: { color: "#fa5252" },
-        areaStyle: { opacity: 0.08 },
+      legend: { data: ["收入", "支出"], bottom: 0 },
+      grid: { left: 72, right: 24, top: 32, bottom: 48 },
+      xAxis: {
+        type: "category",
+        data: buckets.map(bucket => bucket.label),
+        axisTick: { show: false },
       },
-    ],
-  }), [buckets]);
+      yAxis: {
+        type: "value",
+        min: 0,
+        // 全为 0 时给一个默认量程，避免坐标轴出现 ¥0.01 这类无效刻度。
+        max: peak === 0 ? 10000 : undefined,
+        axisLabel: { formatter: value => formatAmount(value) },
+        splitLine: { lineStyle: { type: "dashed" } },
+      },
+      series: [
+        {
+          name: "收入",
+          type: "line",
+          smooth: true,
+          symbolSize: 6,
+          data: buckets.map(bucket => bucket.income),
+          itemStyle: { color: "#12b886" },
+          areaStyle: { opacity: 0.08 },
+        },
+        {
+          name: "支出",
+          type: "line",
+          smooth: true,
+          symbolSize: 6,
+          data: buckets.map(bucket => bucket.expense),
+          itemStyle: { color: "#fa5252" },
+          areaStyle: { opacity: 0.08 },
+        },
+      ],
+    };
+  }, [buckets]);
 
   if (bills === undefined) {
     return (
