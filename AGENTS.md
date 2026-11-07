@@ -19,6 +19,16 @@ yarn lint      # ESLint 检查
 
 改完代码跑 `yarn lint` 确认无报错即可，不需要跑构建验证。
 
+## 提交规范
+
+commit 是细粒度的：每完成一个小功能点就 commit 一次，不要攒到整个模块做完才提交。一个页面拆出一个组件、加了一个工具函数、接通一处数据，都各自是一次提交。
+
+commit message 格式为 `feat/fix/chore: {message}`：
+
+- 类型只在这三者中选：新功能 `feat`，修 bug `fix`，杂务（依赖、配置、文档等）`chore`
+- `message` 全部小写、用最简单明了的英文（如 `feat: add transaction form`、`fix: calendar date parsing`、`chore: add date-fns`）
+- 只写标题一行，不写 description/body
+
 ## 目录结构
 
 - `src/main.tsx` — 入口：StrictMode + MantineProvider + BrowserRouter，已引入 `@mantine/core/styles.css`，不要再重复引入
