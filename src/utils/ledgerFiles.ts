@@ -182,7 +182,15 @@ function parseCsv(text: string, fileName: string): ImportPreview {
     transformHeader: header => header.replace(/^\uFEFF/, "").trim(),
   });
 
+  const parseErrorRows = new Set<number>();
+  let hasGlobalParseError = false;
   result.errors.forEach((error) => {
+    if (typeof error.row === "number") {
+      parseErrorRows.add(error.row);
+    }
+    else {
+      hasGlobalParseError = true;
+    }
     preview.issues.push({
       row: typeof error.row === "number" ? error.row + 2 : undefined,
       message: error.message,
@@ -206,8 +214,10 @@ function parseCsv(text: string, fileName: string): ImportPreview {
     });
     return preview;
   }
+  if (hasGlobalParseError) return preview;
 
   result.data.forEach((row, index) => {
+    if (parseErrorRows.has(index)) return;
     const transaction = readCsvTransaction(row, columns, index + 2, preview.issues);
     if (transaction) preview.transactions.push(transaction);
   });
