@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Loader } from "@mantine/core";
+import { useLiveQuery } from "dexie-react-hooks";
+import { useState, type FormEvent } from "react";
 import { budgets, transactions } from "../shared/db";
-import type { MonthlyBudget } from "../shared/types";
 import "./Budget.css";
 
 // 金额在库里统一存整数分（见 src/shared/types.ts 注释），页面输入与展示均用元
@@ -27,33 +28,27 @@ function percent(spent: number, amount: number) {
 }
 
 export default function Budget() {
-  const [rows, setRows] = useState<MonthlyBudget[]>([]);
-  const [spendMap, setSpendMap] = useState<Record<string, number>>({});
-  const [month, setMonth] = useState(currentMonth());
+  const [month, setMonth] = useState(currentMonth);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [confirmId, setConfirmId] = useState("");
 
-  // 重新拉取：所有月份预算 + 每月支出合计
-  const reload = useCallback(async () => {
-    const [all, bills] = await Promise.all([
-      budgets.list(),
-      transactions.list({ type: "expense" }),
-    ]);
+  const rows = useLiveQuery(() => budgets.list());
+  const spendMap = useLiveQuery(async () => {
+    const bills = await transactions.list({ type: "expense" });
     const map: Record<string, number> = {};
     for (const bill of bills) {
-      const m = monthOf(bill.date);
-      map[m] = (map[m] ?? 0) + bill.amount;
+      const billMonth = monthOf(bill.date);
+      map[billMonth] = (map[billMonth] ?? 0) + bill.amount;
     }
-    setRows(all);
-    setSpendMap(map);
-  }, []);
+    return map;
+  });
 
-  useEffect(() => {
-    void reload();
-  }, [reload]);
+  if (rows === undefined || spendMap === undefined) {
+    return <Loader role="status" aria-label="正在加载预算" />;
+  }
 
-  const editing = rows.find((row) => row.month === month);
+  const editing = rows.find(row => row.month === month);
   const spent = spendMap[month] ?? 0;
   const remaining = (editing?.amount ?? 0) - spent;
 
@@ -62,7 +57,7 @@ export default function Budget() {
     if (next === "") return;
     setMonth(next);
     setError("");
-    const found = rows.find((row) => row.month === next);
+    const found = rows.find(row => row.month === next);
     setDraft(found ? fenToYuan(found.amount) : "");
   }
 
@@ -76,7 +71,6 @@ export default function Budget() {
     await budgets.set({ month, amount: Math.round(yuan * 100) });
     setDraft("");
     setError("");
-    await reload();
   }
 
   async function removeOne(target: string) {
@@ -91,7 +85,6 @@ export default function Budget() {
       setDraft("");
       setError("");
     }
-    await reload();
   }
 
   return (
