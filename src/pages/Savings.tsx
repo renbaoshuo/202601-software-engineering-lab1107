@@ -73,6 +73,8 @@ export default function Savings() {
   const [target, setTarget] = useState<string | number>("");
   const [depositGoal, setDepositGoal] = useState<SavingsGoal | null>(null);
   const [depositAmount, setDepositAmount] = useState<string | number>("");
+  const [creating, setCreating] = useState(false);
+  const [depositing, setDepositing] = useState(false);
 
   const canCreate = name.trim().length > 0 && typeof target === "number" && target > 0;
   const canDeposit = depositGoal !== null
@@ -86,9 +88,16 @@ export default function Savings() {
   }
 
   async function handleCreate() {
-    if (typeof target !== "number" || !name.trim() || target <= 0) return;
-    await savingsGoals.add({ name: name.trim(), targetAmount: toCents(target) });
-    closeCreate();
+    if (creating || typeof target !== "number" || !name.trim() || target <= 0) return;
+    // 写入期间锁住按钮，避免连点重复创建目标。
+    setCreating(true);
+    try {
+      await savingsGoals.add({ name: name.trim(), targetAmount: toCents(target) });
+      closeCreate();
+    }
+    finally {
+      setCreating(false);
+    }
   }
 
   function closeDeposit() {
@@ -97,9 +106,16 @@ export default function Savings() {
   }
 
   async function handleDeposit() {
-    if (!depositGoal || typeof depositAmount !== "number" || depositAmount <= 0) return;
-    await savingsGoals.deposit(depositGoal.id, toCents(depositAmount));
-    closeDeposit();
+    if (depositing || !depositGoal || typeof depositAmount !== "number" || depositAmount <= 0) return;
+    // 存入是累加操作，写入期间重复提交会把同一笔钱记多次。
+    setDepositing(true);
+    try {
+      await savingsGoals.deposit(depositGoal.id, toCents(depositAmount));
+      closeDeposit();
+    }
+    finally {
+      setDepositing(false);
+    }
   }
 
   let content: ReactNode;
@@ -155,7 +171,7 @@ export default function Savings() {
             value={target}
             onChange={setTarget}
           />
-          <Button disabled={!canCreate} onClick={handleCreate}>创建</Button>
+          <Button disabled={!canCreate || creating} loading={creating} onClick={handleCreate}>创建</Button>
         </Stack>
       </Modal>
       <Modal
@@ -176,7 +192,7 @@ export default function Savings() {
             onChange={setDepositAmount}
             data-autofocus
           />
-          <Button disabled={!canDeposit} onClick={handleDeposit}>确认存入</Button>
+          <Button disabled={!canDeposit || depositing} loading={depositing} onClick={handleDeposit}>确认存入</Button>
         </Stack>
       </Modal>
     </Container>
