@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Button,
   Card,
@@ -12,7 +12,8 @@ import {
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import "@mantine/dates/styles.css";
-import { IconCalendar, IconDeviceFloppy } from "@tabler/icons-react";
+import { IconArrowLeft, IconCalendar, IconDeviceFloppy } from "@tabler/icons-react";
+import { useLocation, useNavigate } from "react-router";
 import { DEFAULT_CATEGORIES } from "../shared/constants";
 import { transactions } from "../shared/db";
 import type { TransactionType } from "../shared/types";
@@ -25,6 +26,9 @@ interface FormErrors {
 }
 
 export default function TransactionForm() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const amountRef = useRef<HTMLInputElement>(null);
   const [type, setType] = useState<TransactionType>("expense");
   const [amount, setAmount] = useState<number | string>("");
   const [category, setCategory] = useState<string | null>(null);
@@ -66,7 +70,17 @@ export default function TransactionForm() {
     return Object.keys(next).length === 0;
   }
 
-  async function handleSave() {
+  function goBack() {
+    // 直接打开 /transactions 时没有上一页，退回账单列表。
+    if (location.key === "default") {
+      navigate("/transactions");
+    }
+    else {
+      navigate(-1);
+    }
+  }
+
+  async function handleSave(continueAdding: boolean) {
     if (!validate()) return;
 
     await transactions.add({
@@ -77,10 +91,17 @@ export default function TransactionForm() {
       note: note.trim(),
     });
 
-    setAmount("");
-    setNote("");
-    setCategory(null);
-    setErrors({});
+    if (continueAdding) {
+      // 连续记账保留日期与收支类型，只清空本笔业务字段并聚焦金额。
+      setAmount("");
+      setNote("");
+      setCategory(null);
+      setErrors({});
+      amountRef.current?.focus();
+    }
+    else {
+      goBack();
+    }
   }
 
   return (
@@ -109,6 +130,7 @@ export default function TransactionForm() {
             error={errors.date}
           />
           <NumberInput
+            ref={amountRef}
             label="金额（元）"
             description="最多保留两位小数"
             placeholder="0.00"
@@ -145,9 +167,19 @@ export default function TransactionForm() {
           />
         </SimpleGrid>
 
-        <Group justify="flex-end">
-          <Button leftSection={<IconDeviceFloppy size={16} />} onClick={handleSave}>
-            保存
+        <Group justify="flex-end" gap="sm">
+          <Button
+            variant="default"
+            leftSection={<IconArrowLeft size={16} />}
+            onClick={() => handleSave(false)}
+          >
+            保存并返回
+          </Button>
+          <Button
+            leftSection={<IconDeviceFloppy size={16} />}
+            onClick={() => handleSave(true)}
+          >
+            保存并再记一笔
           </Button>
         </Group>
       </Stack>
