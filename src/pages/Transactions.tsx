@@ -168,7 +168,14 @@ export default function Transactions() {
                           )}
                         </Stack>
                       )
-                    : <TransactionTable records={result.records} onEdit={transaction => setForm({ transaction })} />}
+                    : (
+                        <TransactionTable
+                          key={result.records.map(record => record.id).join(",")}
+                          records={result.records}
+                          onEdit={transaction => setForm({ transaction })}
+                          onDeleted={count => setNotice({ message: `已删除 ${count} 笔账单` })}
+                        />
+                      )}
               </Card>
             )}
 
@@ -205,7 +212,7 @@ export default function Transactions() {
           <Notification
             color="green"
             icon={<IconCheck size={18} />}
-            title="保存成功"
+            title="操作成功"
             closeButtonProps={{ "aria-label": "关闭提示" }}
             onClose={() => setNotice(null)}
           >
