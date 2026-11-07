@@ -6,6 +6,7 @@ import {
   Card,
   Container,
   Group,
+  Pagination,
   Select,
   Stack,
   Table,
@@ -71,23 +72,30 @@ type SortOrder = "asc" | "desc";
 export default function Transactions() {
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [page, setPage] = useState(1);
 
-  // 列表数据：按排序字段和方向查询
+  // 当前页数据：用 Dexie 的 offset/limit 做服务端分页
   const pageData = useLiveQuery(
     () =>
       transactions.list({
         sortBy: sortField,
         order: sortOrder,
+        offset: (page - 1) * PAGE_SIZE,
+        limit: PAGE_SIZE,
       }),
-    [sortField, sortOrder],
+    [sortField, sortOrder, page],
   );
 
-  // 总条数
+  // 总条数（用于计算分页）
   const total = useLiveQuery(() => transactions.count(), []);
+
+  const totalPages = total ? Math.max(1, Math.ceil(total / PAGE_SIZE)) : 1;
+  const currentPage = Math.min(page, totalPages);
 
   function handleSortFieldChange(value: string | null) {
     if (value) {
       setSortField(value as SortField);
+      setPage(1);
     }
   }
 
@@ -98,6 +106,7 @@ export default function Transactions() {
   // 写入示例数据到 IndexedDB，方便演示
   async function loadDemoData() {
     await transactions.addMany(DEMO_TRANSACTIONS);
+    setPage(1);
   }
 
   return (
@@ -183,6 +192,18 @@ export default function Transactions() {
                 )}
         </Card>
 
+        {/* 分页 */}
+        {pageData && pageData.length > 0 && (
+          <Group justify="center">
+            <Pagination
+              value={currentPage}
+              onChange={setPage}
+              total={totalPages}
+              siblings={1}
+            />
+          </Group>
+        )}
+
         {/* 统计信息 */}
         <Group justify="space-between">
           <Text size="sm" c="dimmed">
@@ -192,7 +213,7 @@ export default function Transactions() {
             {" "}
             {total ?? 0}
             {" "}
-            条记录
+            条记录，第 {currentPage}/{totalPages} 页
           </Text>
         </Group>
       </Stack>
