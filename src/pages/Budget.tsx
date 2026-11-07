@@ -13,9 +13,9 @@ function currentMonth() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
-// 进度条颜色：未过半绿色，接近超支，超支红色
+// 进度条颜色：低于 80% 为绿色，80% 到 100% 为黄色，超支为红色
 function barColor(spent: number, amount: number) {
-  if (amount > 0 && spent >= amount) return "budget-bar__fill--over";
+  if (amount > 0 && spent > amount) return "budget-bar__fill--over";
   if (amount > 0 && spent >= amount * 0.8) return "budget-bar__fill--warn";
   return "";
 }
@@ -122,7 +122,7 @@ export default function Budget() {
               />
             </div>
             <p className="budget-bar__text">
-              {editing.amount > 0 && spent >= editing.amount
+              {editing.amount > 0 && spent > editing.amount
                 ? "本月预算已超支！"
                 : `已使用 ${Math.round(percent(spent, editing.amount))}%`}
             </p>
