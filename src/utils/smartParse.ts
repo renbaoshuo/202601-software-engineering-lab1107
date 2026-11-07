@@ -36,6 +36,13 @@ const DATE_PATTERNS = [
   /大前天|前天|昨天|昨日|今天|今日/,
 ];
 
+const AMOUNT_TOKEN = /[+-]?\s*(?:\d+(?:,\d+)*(?:\.\d+)?|\.\d+)/.source;
+const AMOUNT_PATTERNS = [
+  new RegExp(`[+-]?\\s*¥${AMOUNT_TOKEN}`),
+  new RegExp(`${AMOUNT_TOKEN}\\s*[元块圆]`),
+  new RegExp(AMOUNT_TOKEN),
+];
+
 function parseDateText(text: string): Date {
   const today = new Date();
   if (text.includes("大前天")) return subDays(today, 3);
@@ -70,21 +77,19 @@ function parseCategory(text: string, type: TransactionType): string {
 }
 
 function parseAmount(text: string): number | null {
-  const stripped = DATE_PATTERNS.reduce((value, pattern) => value.replace(pattern, " "), text);
-  const patterns = [
-    /[¥￥]\s*(\d+(?:\.\d+)?)/,
-    /(\d+(?:\.\d+)?)\s*(?:元|块|圆)/,
-    /(\d+(?:\.\d+)?)/,
-  ];
+  const normalized = text.normalize("NFKC").replaceAll("−", "-");
+  const stripped = DATE_PATTERNS.reduce((value, pattern) => value.replace(pattern, " "), normalized);
 
-  for (const pattern of patterns) {
+  for (const pattern of AMOUNT_PATTERNS) {
     const match = stripped.match(pattern);
-    if (match) {
-      const yuan = Number.parseFloat(match[1]);
-      if (Number.isFinite(yuan) && yuan > 0) {
-        return toCents(Math.round(yuan * 100) / 100);
-      }
-    }
+    if (!match) continue;
+
+    // 换算会四舍五入，因此要先按原文校验金额符号和小数位数。
+    const amount = match[0].replace(/[¥元块圆\s]/g, "");
+    if (!/^\+?(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(amount)) return null;
+
+    const yuan = Number(amount);
+    return Number.isFinite(yuan) && yuan > 0 ? toCents(yuan) : null;
   }
 
   return null;

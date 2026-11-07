@@ -96,7 +96,7 @@ export default function TransactionForm() {
   function handleParse() {
     const result = parseTransactionText(parseText);
     if (!result) {
-      setParseError("没听懂这句话，试试「昨天打车花了 25」");
+      setParseError("请输入大于 0、最多两位小数的金额，例如「昨天打车花了 25」");
       setParseTip("");
       return;
     }
