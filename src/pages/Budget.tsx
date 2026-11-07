@@ -1,4 +1,5 @@
 import { Loader } from "@mantine/core";
+import { useTimeout } from "@mantine/hooks";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useState, type FormEvent } from "react";
 import { budgets, transactions } from "../shared/db";
@@ -32,6 +33,7 @@ export default function Budget() {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [confirmId, setConfirmId] = useState("");
+  const { start, clear } = useTimeout(() => setConfirmId(""), 3000);
 
   const rows = useLiveQuery(() => budgets.list());
   const spendMap = useLiveQuery(async () => {
@@ -74,9 +76,10 @@ export default function Budget() {
   }
 
   async function removeOne(target: string) {
+    clear();
     if (confirmId !== target) {
       setConfirmId(target);
-      setTimeout(() => setConfirmId(""), 3000); // 3 秒内再点一次才算确认
+      start();
       return;
     }
     setConfirmId("");
