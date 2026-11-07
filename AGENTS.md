@@ -35,6 +35,15 @@ commit message 格式为 `feat/fix/chore: {message}`：
 - `src/App.tsx` — 路由表，所有页面挂在 `<AppLayout />` 内
 - `src/components/` — 跨页面复用的通用组件（如 `AppLayout` 布局、`PagePlaceholder`）
 - `src/pages/` — 页面组件，每个文件默认导出一个函数组件
+- `src/shared/` — 公共存储接口（`db.ts`）和共享数据类型（`types.ts`）
+
+## 数据存储约定
+
+- 业务数据统一通过 `src/shared/db.ts` 的接口读写，由 Dexie 保存到当前站点的 IndexedDB。页面复用 `src/shared/types.ts` 的类型。数据库结构集中在 `db.ts`，升级时新增 Dexie 版本并按需迁移已有数据。
+- 金额统一用整数分，例如 `1250` 表示 `12.50` 元。账单金额为正数，收支方向由 `type` 区分。账单日期用本地 `YYYY-MM-DD`，预算月份用 `YYYY-MM`。分类是精确匹配的字符串，空备注用 `""`。
+- 账单流水、日历、总览和统计共用 `transactions.list(query)`。默认按账单日期降序，日期和金额范围包含端点，关键词匹配分类或备注且忽略大小写。分页用 `offset`、`limit` 和 `transactions.count(filter)`。React 页面用 `dexie-react-hooks` 的 `useLiveQuery` 订阅查询，首次加载时处理 `undefined`。
+- `budgets` 按月份保存预算额，使用额按该月支出账单计算。`savingsGoals.deposit(id, amount)` 累加目标的已存金额，与账单独立。`get` 找不到记录时返回 `undefined`，`update` 和 `deposit` 找不到记录时返回 `false`。
+- 数据管理页负责 JSON/CSV 文件的解析和校验。`ledgerBackup.read()` 返回完整快照，`ledgerBackup.restore(backup)` 在一个事务中覆盖现有数据。CSV 账单解析成 `NewTransaction[]` 后用 `transactions.addMany` 追加。
 
 ## 编码原则
 
@@ -44,7 +53,6 @@ commit message 格式为 `feat/fix/chore: {message}`：
 - Mantine 覆盖不到的业务组件（如「账单表单」「分类饼图卡片」），基于 Mantine 组件二次封装，放在 `src/components/`，不要从原生 HTML/CSS 从头实现。
 - 图标统一从 `@tabler/icons-react` 引入，不要混入其他图标库或手写 SVG。
 - 通用逻辑先看 `@mantine/hooks` 有没有现成的（如 `use-local-storage`、`use-debounced-value`、`use-clipboard`）。
-- 数据持久化按作业要求走本地文件（JSON/CSV），用 localStorage 或 File System API 实现即可，不引入后端。
 
 ### 2. 工具函数优先引三方库
 
