@@ -26,34 +26,6 @@
   color: #dc2626;
 }
 
-.budget-bar {
-  height: 10px;
-  background: #f1f5f9;
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.budget-bar--small {
-  height: 6px;
-  min-width: 90px;
-}
-
-.budget-bar__fill {
-  display: block;
-  height: 100%;
-  background: #22c55e;
-  border-radius: inherit;
-  transition: width 0.3s ease;
-}
-
-.budget-bar__fill--warn {
-  background: #f59e0b;
-}
-
-.budget-bar__fill--over {
-  background: #dc2626;
-}
-
 .budget-bar__text {
   margin: 8px 0 0;
   font-size: 13px;

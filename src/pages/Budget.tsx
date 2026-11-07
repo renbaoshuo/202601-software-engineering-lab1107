@@ -1,4 +1,4 @@
-import { Loader } from "@mantine/core";
+import { Loader, Progress } from "@mantine/core";
 import { useTimeout } from "@mantine/hooks";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useState, type FormEvent } from "react";
@@ -15,17 +15,40 @@ function currentMonth() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
-// 进度条颜色：低于 80% 为绿色，80% 到 100% 为黄色，超支为红色
-function barColor(spent: number, amount: number) {
-  if (amount > 0 && spent > amount) return "budget-bar__fill--over";
-  if (amount > 0 && spent >= amount * 0.8) return "budget-bar__fill--warn";
-  return "";
+interface BudgetProgressProps {
+  month: string;
+  spent: number;
+  amount: number;
+  compact?: boolean;
 }
 
-// 安全的百分比，避免 amount 为 0 时除零产生 NaN
 function percent(spent: number, amount: number) {
-  if (amount <= 0) return 0;
-  return Math.min(100, (spent / amount) * 100);
+  return amount > 0 ? (spent / amount) * 100 : 0;
+}
+
+function BudgetProgress({ month, spent, amount, compact }: BudgetProgressProps) {
+  const usage = percent(spent, amount);
+  const overBudget = amount > 0 && spent > amount;
+  const color = overBudget ? "#dc2626" : usage >= 80 ? "#f59e0b" : "#22c55e";
+  const value = Math.min(100, usage);
+  const usageText = usage.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
+
+  return (
+    <Progress.Root
+      size={compact ? 6 : 10}
+      miw={compact ? 90 : undefined}
+      radius="xl"
+      transitionDuration={300}
+      role="progressbar"
+      aria-label={`${month} 预算使用率`}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={value}
+      aria-valuetext={`${usageText}%${overBudget ? "，已超支" : ""}`}
+    >
+      <Progress.Section value={value} color={color} withAria={false} />
+    </Progress.Root>
+  );
 }
 
 export default function Budget() {
@@ -111,12 +134,7 @@ export default function Budget() {
                 剩余 <strong>¥{fenToYuan(remaining)}</strong>
               </div>
             </div>
-            <div className="budget-bar">
-              <span
-                className={`budget-bar__fill ${barColor(spent, editing.amount)}`}
-                style={{ width: `${percent(spent, editing.amount)}%` }}
-              />
-            </div>
+            <BudgetProgress month={month} spent={spent} amount={editing.amount} />
             <p className="budget-bar__text">
               {editing.amount > 0 && spent > editing.amount
                 ? "本月预算已超支！"
@@ -181,12 +199,7 @@ export default function Budget() {
                     <td>¥{fenToYuan(row.amount)}</td>
                     <td>¥{fenToYuan(rowSpent)}</td>
                     <td>
-                      <div className="budget-bar budget-bar--small">
-                        <span
-                          className={`budget-bar__fill ${barColor(rowSpent, row.amount)}`}
-                          style={{ width: `${percent(rowSpent, row.amount)}%` }}
-                        />
-                      </div>
+                      <BudgetProgress month={row.month} spent={rowSpent} amount={row.amount} compact />
                     </td>
                     <td className={rowLeft < 0 ? "budget-negative" : undefined}>
                       <strong>¥{fenToYuan(rowLeft)}</strong>
