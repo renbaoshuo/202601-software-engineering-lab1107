@@ -7,7 +7,6 @@ import DataManagement from "./pages/DataManagement";
 import NotFound from "./pages/NotFound";
 import Reports from "./pages/Reports";
 import Savings from "./pages/Savings";
-import Settings from "./pages/Settings";
 import Transactions from "./pages/Transactions";
 
 export default function App() {
@@ -21,7 +20,6 @@ export default function App() {
         <Route element={<Budget />} path="/budget" />
         <Route element={<Savings />} path="/savings" />
         <Route element={<DataManagement />} path="/data" />
-        <Route element={<Settings />} path="/settings" />
         <Route element={<NotFound />} path="*" />
       </Route>
     </Routes>
