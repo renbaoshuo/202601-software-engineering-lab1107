@@ -7,6 +7,7 @@ import {
   Container,
   Group,
   Pagination,
+  SegmentedControl,
   Select,
   Stack,
   Table,
@@ -73,6 +74,7 @@ export default function Transactions() {
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [page, setPage] = useState(1);
+  const [showRecent, setShowRecent] = useState(false);
 
   // 当前页数据：用 Dexie 的 offset/limit 做服务端分页
   const pageData = useLiveQuery(
@@ -80,10 +82,10 @@ export default function Transactions() {
       transactions.list({
         sortBy: sortField,
         order: sortOrder,
-        offset: (page - 1) * PAGE_SIZE,
-        limit: PAGE_SIZE,
+        offset: showRecent ? 0 : (page - 1) * PAGE_SIZE,
+        limit: showRecent ? 5 : PAGE_SIZE,
       }),
-    [sortField, sortOrder, page],
+    [sortField, sortOrder, page, showRecent],
   );
 
   // 总条数（用于计算分页）
@@ -112,7 +114,20 @@ export default function Transactions() {
   return (
     <Container size="lg">
       <Stack gap="md">
-        <Title order={2}>账单流水</Title>
+        <Group justify="space-between">
+          <Title order={2}>账单流水</Title>
+          <SegmentedControl
+            value={showRecent ? "recent" : "all"}
+            onChange={(v) => {
+              setShowRecent(v === "recent");
+              setPage(1);
+            }}
+            data={[
+              { label: "全部账单", value: "all" },
+              { label: "最近 5 条", value: "recent" },
+            ]}
+          />
+        </Group>
 
         {/* 排序控制区 */}
         <Card withBorder padding="sm">
@@ -193,7 +208,7 @@ export default function Transactions() {
         </Card>
 
         {/* 分页 */}
-        {pageData && pageData.length > 0 && (
+        {!showRecent && pageData && pageData.length > 0 && (
           <Group justify="center">
             <Pagination
               value={currentPage}
@@ -213,7 +228,8 @@ export default function Transactions() {
             {" "}
             {total ?? 0}
             {" "}
-            条记录，第 {currentPage}/{totalPages} 页
+            条记录
+            {showRecent ? "（展示最近 5 条）" : `，第 ${currentPage}/${totalPages} 页`}
           </Text>
         </Group>
       </Stack>
