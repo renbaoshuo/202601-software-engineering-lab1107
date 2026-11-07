@@ -2,6 +2,7 @@ import {
   Card,
   Group,
   SimpleGrid,
+  Skeleton,
   Stack,
   Text,
   ThemeIcon,
@@ -12,15 +13,14 @@ import {
   IconArrowUpRight,
   IconWallet,
 } from "@tabler/icons-react";
-import { liveQuery } from "dexie";
-import { useEffect, useState, type ReactNode } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
+import type { ReactNode } from "react";
 import { transactions } from "../shared/db";
-import type { Transaction } from "../shared/types";
 import { formatAmount } from "../utils/format";
 
 interface SummaryCardProps {
   title: string;
-  amount: number;
+  amount: number | null;
   color: string;
   icon: ReactNode;
 }
@@ -33,9 +33,13 @@ function SummaryCard({ title, amount, color, icon }: SummaryCardProps) {
           <Text c="dimmed" fw={500} size="sm">
             {title}
           </Text>
-          <Text c={color} fw={700} size="xl">
-            {formatAmount(amount)}
-          </Text>
+          {amount === null
+            ? <Skeleton height={29} width={140} />
+            : (
+                <Text c={color} fw={700} size="xl">
+                  {formatAmount(amount)}
+                </Text>
+              )}
         </Stack>
         <ThemeIcon color={color} radius="md" size="xl" variant="light">
           {icon}
@@ -46,26 +50,24 @@ function SummaryCard({ title, amount, color, icon }: SummaryCardProps) {
 }
 
 export default function Dashboard() {
-  const [records, setRecords] = useState<Transaction[]>([]);
-
-  useEffect(() => {
-    const subscription = liveQuery(() => transactions.list()).subscribe(setRecords);
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const { totalIncome, totalExpense } = records.reduce(
-    (summary, transaction) => {
+  const records = useLiveQuery(() => transactions.list());
+  const summary = records?.reduce(
+    (result, transaction) => {
       if (transaction.type === "income") {
-        summary.totalIncome += transaction.amount;
+        result.totalIncome += transaction.amount;
       }
       else {
-        summary.totalExpense += transaction.amount;
+        result.totalExpense += transaction.amount;
       }
-      return summary;
+      return result;
     },
     { totalIncome: 0, totalExpense: 0 },
   );
-  const balance = totalIncome - totalExpense;
+  const totalIncome = summary?.totalIncome ?? null;
+  const totalExpense = summary?.totalExpense ?? null;
+  const balance = summary === undefined
+    ? null
+    : summary.totalIncome - summary.totalExpense;
 
   return (
     <Stack gap="xl">
