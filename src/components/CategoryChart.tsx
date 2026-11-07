@@ -55,7 +55,6 @@ export default function CategoryChart({ records }: CategoryChartProps) {
           h={size + 160}
           withLabels
           withLabelsLine
-          labelsPosition="outside"
           labelsType={labelType}
           withLegend
           withTooltip
