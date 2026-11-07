@@ -29,13 +29,19 @@ commit message 格式为 `feat/fix/chore: {message}`：
 - `message` 全部小写、用最简单明了的英文（如 `feat: add transaction form`、`fix: calendar date parsing`、`chore: add date-fns`）
 - 只写标题一行，不写 description/body
 
+提交前先 `git log --oneline` 看一眼历史提交，写出的 message 要和历史风格相符；对不上就参照最近的提交改。
+
 ## 目录结构
+
+新文件必须放进下面该放的位置，不要在别处随意新建目录或文件；目录不存在就直接创建：
 
 - `src/main.tsx` — 入口：StrictMode + MantineProvider + BrowserRouter，已引入 `@mantine/core/styles.css`，不要再重复引入
 - `src/App.tsx` — 路由表，所有页面挂在 `<AppLayout />` 内
-- `src/components/` — 跨页面复用的通用组件（如 `AppLayout` 布局、`PagePlaceholder`）
-- `src/pages/` — 页面组件，每个文件默认导出一个函数组件
-- `src/shared/` — 公共存储接口（`db.ts`）和共享数据类型（`types.ts`）
+- `src/pages/` — 页面组件，每个文件默认导出一个函数组件，一个路由一个文件
+- `src/components/` — 可复用的 UI 组件（如 `AppLayout` 布局、`PagePlaceholder`，以及基于 Mantine 二次封装的业务组件）
+- `src/hooks/` — 自定义 hooks（写之前先确认 `@mantine/hooks` 里没有现成的）
+- `src/utils/` — 工具函数（写之前先确认三方库覆盖不到）
+- `src/shared/` — 只放数据存储相关：`db.ts` 存储接口、`types.ts` 共享数据类型，其他东西不放这里
 
 ## 数据存储约定
 
