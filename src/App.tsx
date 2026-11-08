@@ -1,5 +1,6 @@
 import { Route, Routes } from "react-router";
 import AppLayout from "./components/AppLayout";
+import About from "./pages/About";
 import Budget from "./pages/Budget";
 import Calendar from "./pages/Calendar";
 import Dashboard from "./pages/Dashboard";
@@ -20,6 +21,7 @@ export default function App() {
         <Route element={<Budget />} path="/budget" />
         <Route element={<Savings />} path="/savings" />
         <Route element={<DataManagement />} path="/data" />
+        <Route element={<About />} path="/about" />
         <Route element={<NotFound />} path="*" />
       </Route>
     </Routes>
